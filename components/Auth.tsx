@@ -22,26 +22,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, isDarkMode }) => {
   const inputBorder = isDarkMode ? 'border-stone-800 focus:border-stone-100' : 'border-stone-200 focus:border-stone-900';
   const inputColor = isDarkMode ? 'text-stone-200' : 'text-stone-800';
 
-  const handleQuickAdminLogin = () => {
-    // В реальних умовах використовуйте import.meta.env.VITE_ADMIN_EMAIL або process.env
-    // Для демонстрації перевіряємо ваші секретні дані
-    const adminEmail = 'sssssecretmail@gmail.com';
-    const adminPass = 'svqoadiahht';
-
-    if (email === adminEmail && password === adminPass) {
-      onLogin({
-        id: 'admin-1',
-        email: email,
-        name: 'Адміністратор А',
-        role: 'admin',
-        notifyOnNewBook: true,
-        joinDate: new Date().toLocaleDateString('uk-UA')
-      });
-      return true;
-    }
-    return false;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -49,17 +29,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin, isDarkMode }) => {
 
     try {
       if (isLogin) {
-        // Перевірка на швидкий вхід адміна (Development mode)
-        if (handleQuickAdminLogin()) return;
-
-        // Стандартний запит до API
-        const response = await apiService.login(email, password);
-        
-        if (response.user) {
-          onLogin(response.user);
-        } else {
-          setError(response.error || 'Невірний логін або пароль.');
-        }
+        const user = await apiService.login(email, password);
+        onLogin(user);
       } else {
         if (!email || !password || !name) {
           setError('Будь ласка, заповніть усі поля.');
@@ -67,19 +38,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, isDarkMode }) => {
           return;
         }
 
-        // Імітація реєстрації (роль призначається сервером)
-        const newUser: User = {
-          id: 'u-' + Math.random().toString(36).substr(2, 9),
-          email: email,
-          name: name,
-          role: 'user',
-          notifyOnNewBook: false,
-          joinDate: new Date().toLocaleDateString('uk-UA')
-        };
-        onLogin(newUser);
+        const user = await apiService.register(name, email, password);
+        onLogin(user);
       }
     } catch (err) {
-      setError('Виникла помилка при з’єднанні з сервером.');
+      setError(err instanceof Error ? err.message : 'Виникла помилка при з’єднанні з сервером.');
     } finally {
       setIsLoading(false);
     }

@@ -29,6 +29,8 @@ const App: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [storefrontGenreFilter, setStorefrontGenreFilter] = useState('Всі');
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [appError, setAppError] = useState<string | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -42,40 +44,62 @@ const App: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [b, u, o, c] = await Promise.all([
+      setAppError(null);
+      const [b, u, c] = await Promise.all([
         apiService.getBooks(),
         apiService.getUsers(),
-        apiService.getOrders(),
         apiService.getCategories()
       ]);
       setBooks(b || []);
       setAllUsers(u || []);
-      setAllOrders(o || []);
       setCategories(c || []);
     } catch (error) {
       console.error("API connection failed:", error);
-      setBooks([]);
-      setAllUsers([]);
-      setAllOrders([]);
-      setCategories([]);
+      setAppError(error instanceof Error ? error.message : 'Помилка завантаження даних.');
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-    const savedUser = localStorage.getItem('lystopad_current_user');
-    if (savedUser) setCurrentUser(JSON.parse(savedUser));
+    const bootstrap = async () => {
+      await fetchData();
+      try {
+        if (apiService.getTokenState().hasAccess || apiService.getTokenState().hasRefresh) {
+          const me = await apiService.getMe();
+          setCurrentUser(me);
+          const scopedOrders = me.role === 'admin' ? await apiService.getOrders() : await apiService.getMyOrders();
+          setAllOrders(scopedOrders);
+        } else {
+          setAllOrders([]);
+        }
+      } catch (error) {
+        await apiService.logout();
+        setCurrentUser(null);
+      } finally {
+        setIsBootstrapping(false);
+      }
+    };
+    bootstrap();
   }, [fetchData]);
 
-  const handleLogin = useCallback((user: User) => {
+  const handleLogin = useCallback(async (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('lystopad_current_user', JSON.stringify(user));
+    try {
+      const [scopedOrders, freshUsers] = await Promise.all([
+        user.role === 'admin' ? apiService.getOrders() : apiService.getMyOrders(),
+        apiService.getUsers()
+      ]);
+      setAllOrders(scopedOrders);
+      setAllUsers(freshUsers);
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : 'Не вдалося оновити дані профілю.');
+    }
     setActiveView('storefront');
   }, []);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    await apiService.logout();
     setCurrentUser(null);
-    localStorage.removeItem('lystopad_current_user');
+    setAllOrders([]);
     setActiveView('storefront');
   }, []);
 
@@ -92,8 +116,8 @@ const App: React.FC = () => {
 
   const updateBook = useCallback(async (b: Book) => {
     try {
-      await apiService.updateBook(b);
-      setBooks(prev => prev.map(book => book.id === b.id ? b : book));
+      const updated = await apiService.updateBook(b);
+      setBooks(prev => prev.map(book => book.id === b.id ? updated : book));
     } catch (e) {
       console.error(e);
     }
@@ -131,16 +155,24 @@ const App: React.FC = () => {
   }));
 
   const handleUpdateCategories = useCallback(async (newCats: string[]) => {
-    setCategories(newCats);
-    await apiService.saveCategories(newCats);
+    try {
+      await apiService.saveCategories(newCats);
+      setCategories(newCats);
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : 'Не вдалося зберегти жанри.');
+    }
   }, []);
 
   const handleRenameCategory = useCallback(async (oldName: string, newName: string) => {
     const newCats = categories.map(c => c === oldName ? newName : c);
-    setCategories(newCats);
-    await apiService.saveCategories(newCats);
-    
-    
+    try {
+      await apiService.saveCategories(newCats);
+      setCategories(newCats);
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : 'Не вдалося зберегти жанри.');
+      return;
+    }
+
     const updatedBooks = books.map(book => {
       if (book.categories?.includes(oldName)) {
         return {
@@ -152,9 +184,28 @@ const App: React.FC = () => {
     });
     
     setBooks(updatedBooks);
-
-    await apiService.saveBooks(updatedBooks);
   }, [categories, books]);
+
+  const handleCheckoutComplete = useCallback(async (payload: {
+    paymentMethod: Order['paymentMethod'];
+    deliveryMethod: Order['deliveryMethod'];
+  }) => {
+    if (!currentUser) throw new Error('Спочатку виконайте вхід.');
+    await apiService.validateCart({
+      items: cart.map(item => ({ bookId: item.book.id, quantity: item.quantity })),
+    });
+    const response = await apiService.createOrder({
+      customerName: currentUser.name,
+      paymentMethod: payload.paymentMethod,
+      deliveryMethod: payload.deliveryMethod,
+      items: cart.map(item => ({ bookId: item.book.id, quantity: item.quantity })),
+    });
+    setAllOrders(prev => [response.order, ...prev]);
+    const refreshedBooks = await apiService.getBooks();
+    setBooks(refreshedBooks);
+    setCart([]);
+    setActiveView('success');
+  }, [cart, currentUser]);
 
   const renderView = () => {
     switch (activeView) {
@@ -176,11 +227,21 @@ const App: React.FC = () => {
         />
       );
       case 'inventory': return <Inventory books={books} categories={categories} onUpdateCategories={handleUpdateCategories} onRenameCategory={handleRenameCategory} onAddBook={handleAddBook} onUpdateBook={updateBook} onDeleteBook={deleteBook} isDarkMode={isDarkMode} />;
-      case 'admin_orders': return <AdminOrders orders={allOrders} customers={customers} onUpdateStatus={async (id, s) => { setAllOrders(prev => prev.map(o => o.id === id ? { ...o, status: s } : o)); }} isDarkMode={isDarkMode} />;
+      case 'admin_orders': return <AdminOrders orders={allOrders} customers={customers} onUpdateStatus={async (id, s) => {
+        const previousOrders = allOrders;
+        setAllOrders(prev => prev.map(o => o.id === id ? { ...o, status: s } : o));
+        try {
+          const updatedOrder = await apiService.updateOrderStatus(id, s);
+          setAllOrders(prev => prev.map(order => order.id === id ? updatedOrder : order));
+        } catch (error) {
+          setAllOrders(previousOrders);
+          setAppError(error instanceof Error ? error.message : 'Не вдалося оновити статус.');
+        }
+      }} isDarkMode={isDarkMode} />;
       case 'crm': return <CRM customers={customers} books={books} orders={allOrders} isDarkMode={isDarkMode} />;
       case 'auth': return <Auth onLogin={handleLogin} isDarkMode={isDarkMode} />;
       case 'profile': return currentUser ? <Profile user={currentUser} books={books} orders={allOrders} isDarkMode={isDarkMode} wishlistBooks={books.filter(b => wishlist.includes(b.id))} onToggleWishlist={toggleWishlist} onViewBook={b => { setSelectedBook(b); setActiveView('book_details'); }} onLogout={handleLogout} /> : null;
-      case 'checkout': return <Checkout cart={cart} user={currentUser} onComplete={() => {setCart([]); setActiveView('success');}} onUpdateQuantity={(id, d) => setCart(p => p.map(i => i.book.id === id ? { ...i, quantity: Math.max(1, i.quantity + d) } : i))} onRemoveItem={id => setCart(p => p.filter(i => i.book.id !== id))} onBack={() => setActiveView('storefront')} isDarkMode={isDarkMode} />;
+      case 'checkout': return <Checkout cart={cart} user={currentUser} onComplete={handleCheckoutComplete} onUpdateQuantity={(id, d) => setCart(p => p.map(i => i.book.id === id ? { ...i, quantity: Math.max(1, i.quantity + d) } : i))} onRemoveItem={id => setCart(p => p.filter(i => i.book.id !== id))} onBack={() => setActiveView('storefront')} isDarkMode={isDarkMode} />;
       case 'success': return <SuccessPage onContinue={() => setActiveView('storefront')} isDarkMode={isDarkMode} />;
       case 'book_details': return selectedBook ? <BookDetails book={selectedBook} allBooks={books} onAddToCart={addToCart} onViewGenre={g => {setStorefrontGenreFilter(g); setActiveView('storefront');}} onViewBook={setSelectedBook} onBack={() => setActiveView('storefront')} isDarkMode={isDarkMode} wishlist={wishlist} onToggleWishlist={toggleWishlist} /> : null;
       case 'contacts': return <Contacts isDarkMode={isDarkMode} />;
@@ -192,6 +253,16 @@ const App: React.FC = () => {
 
   return (
     <Layout activeView={activeView} setActiveView={setActiveView} user={currentUser} onLogout={handleLogout} isDarkMode={isDarkMode} toggleTheme={() => { setIsDarkMode(!isDarkMode); setCustomBg(''); }} cartCount={cart.reduce((a, i) => a + i.quantity, 0)} onCartClick={() => setActiveView('checkout')} setCustomBg={setCustomBg} customBg={customBg}>
+      {isBootstrapping && (
+        <div className="p-4 mb-4 text-[10px] font-black uppercase tracking-widest opacity-60">
+          Завантаження...
+        </div>
+      )}
+      {appError && (
+        <div className="p-4 mb-4 text-[10px] font-black uppercase tracking-widest border border-rose-900/40 text-rose-500 bg-rose-950/20">
+          {appError}
+        </div>
+      )}
       {renderView()}
     </Layout>
   );

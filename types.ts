@@ -32,7 +32,7 @@ export interface User {
   email: string;
   name: string;
   role: 'user' | 'admin';
-  notifyOnNewBook: boolean;
+  notifyOnNewBook?: boolean;
   joinDate: string;
   wishlist?: string[];
 }
@@ -50,10 +50,27 @@ export interface Order {
   author?: string;
   date: string;
   amount: number;
+   totalAmount?: number;
   status: 'ordered' | 'shipping' | 'at_branch' | 'received';
   paymentMethod: 'card' | 'apple_pay' | 'google_pay' | 'cash_on_delivery';
   deliveryMethod: 'nova_poshta' | 'standard';
   trackingNumber?: string;
+  items?: OrderItem[];
+}
+
+export interface OrderItem {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
+export interface ApiErrorShape {
+  detail: string;
+  code: number;
+  fields?: Record<string, unknown>;
 }
 
 export type ViewType = 

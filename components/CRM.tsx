@@ -20,7 +20,7 @@ const CRM: React.FC<CRMProps> = ({ customers, books, orders, isDarkMode }) => {
   const tableHeaderBg = isDarkMode ? 'bg-stone-950/40' : 'bg-stone-50/40';
   const headerBg = isDarkMode ? 'bg-stone-950/40' : 'bg-stone-50/40';
 
-  // Dynamic calculations
+  
   const totalRevenue = useMemo(() => orders.reduce((acc, o) => acc + o.amount, 0), [orders]);
 
   const filteredCustomers = useMemo(() => {

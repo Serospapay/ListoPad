@@ -32,7 +32,7 @@ const Storefront: React.FC<StorefrontProps> = ({
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('default');
   
-  // Пагінація
+  
   const [currentPage, setCurrentPage] = useState(1);
   const BOOKS_PER_PAGE = 40;
 
@@ -50,7 +50,6 @@ const Storefront: React.FC<StorefrontProps> = ({
       return matchesSearch && matchesCategory && matchesPrice && matchesAvailability;
     });
 
-    // Сортування
     switch (sortBy) {
       case 'price-asc':
         result.sort((a, b) => a.price - b.price);
@@ -71,14 +70,12 @@ const Storefront: React.FC<StorefrontProps> = ({
     return result;
   }, [books, searchQuery, selectedCategory, priceMin, priceMax, onlyAvailable, sortBy]);
 
-  // Розрахунок сторінок
   const totalPages = Math.ceil(filteredBooks.length / BOOKS_PER_PAGE);
   const paginatedBooks = useMemo(() => {
     const start = (currentPage - 1) * BOOKS_PER_PAGE;
     return filteredBooks.slice(start, start + BOOKS_PER_PAGE);
   }, [filteredBooks, currentPage]);
 
-  // Скидання сторінки при зміні фільтрів
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedCategory, priceMin, priceMax, onlyAvailable, sortBy]);
@@ -125,7 +122,7 @@ const Storefront: React.FC<StorefrontProps> = ({
               >
                 <option value="default">За замовчуванням</option>
                 <option value="price-asc">Ціна: від дешевших</option>
-                <option value="price-desc">Ціна: від дородчих</option>
+                <option value="price-desc">Ціна: від дорожчих</option>
                 <option value="pages-asc">Обсяг: від менших</option>
                 <option value="pages-desc">Обсяг: від більших</option>
               </select>

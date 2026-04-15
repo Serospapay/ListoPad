@@ -1,4 +1,5 @@
 
+from django.conf import settings
 from django.db import models
 
 class Category(models.Model):
@@ -28,14 +29,69 @@ class Book(models.Model):
 
     class Meta:
         ordering = ['-id']
+        indexes = [
+            models.Index(fields=['inventory']),
+        ]
 
 class Order(models.Model):
+    class Status(models.TextChoices):
+        ORDERED = 'ordered', 'Оформлено'
+        SHIPPING = 'shipping', 'Відправлено'
+        AT_BRANCH = 'at_branch', 'У відділенні'
+        RECEIVED = 'received', 'Отримано'
+
+    class PaymentMethod(models.TextChoices):
+        CARD = 'card', 'Банківська карта'
+        APPLE_PAY = 'apple_pay', 'Apple Pay'
+        GOOGLE_PAY = 'google_pay', 'Google Pay'
+        CASH_ON_DELIVERY = 'cash_on_delivery', 'При отриманні'
+
+    class DeliveryMethod(models.TextChoices):
+        NOVA_POSHTA = 'nova_poshta', 'Нова Пошта'
+        STANDARD = 'standard', 'Самовивіз'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='orders',
+        null=True,
+        blank=True
+    )
     customer_id = models.CharField(max_length=100)
     customer_name = models.CharField(max_length=255)
-    book_title = models.CharField(max_length=255)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    book_title = models.CharField(max_length=255, blank=True, default='')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=50, default='ordered')
+    status = models.CharField(max_length=50, choices=Status.choices, default=Status.ORDERED)
+    payment_method = models.CharField(
+        max_length=50,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CARD
+    )
+    delivery_method = models.CharField(
+        max_length=50,
+        choices=DeliveryMethod.choices,
+        default=DeliveryMethod.NOVA_POSHTA
+    )
+    tracking_number = models.CharField(max_length=100, blank=True, null=True)
     
     class Meta:
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['customer_id']),
+            models.Index(fields=['status']),
+        ]
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    book = models.ForeignKey(Book, on_delete=models.PROTECT, related_name='order_items')
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    line_total = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['book']),
+        ]

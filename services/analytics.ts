@@ -17,5 +17,5 @@ export const getHardcodedInsight = (orders: Order[], books: Book[]) => {
   
   const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
 
-  return `Звіт системи: Наразі оформлено ${totalSales} замовлень. Увага: ${lowStock} позицій на складі потребують поповнення (менше 5 шт). Найпопулярнішим жанром серед читачів зараз є "${topGenre}".`;
+  return `Зроблено ${totalSales} замовлень. Закінчується ${lowStock} книг. Найпопулярнішим жанром є "${topGenre}".`;
 };

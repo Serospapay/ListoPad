@@ -117,7 +117,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ orders, customers, onUpdateSt
                         <td className="px-8 py-6 text-right">
                           <select 
                             value={order.status}
-                            onChange={(e) => onUpdateStatus(order.id, e.target.value as any)}
+                            onChange={(e) => onUpdateStatus(order.id, e.target.value as Order['status'])}
                             className={`text-[9px] font-black uppercase tracking-widest bg-transparent border p-2 focus:outline-none ${isDarkMode ? 'border-stone-800 text-stone-400' : 'border-stone-200 text-stone-600'}`}
                           >
                             <option value="ordered">Оформлено</option>

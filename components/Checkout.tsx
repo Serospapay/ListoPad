@@ -5,7 +5,10 @@ import { CartItem, User } from '../types';
 interface CheckoutProps {
   cart: CartItem[];
   user: User | null;
-  onComplete: () => void;
+  onComplete: (args: {
+    paymentMethod: 'card' | 'apple_pay' | 'google_pay' | 'cash_on_delivery';
+    deliveryMethod: 'nova_poshta' | 'standard';
+  }) => Promise<void>;
   onUpdateQuantity: (bookId: string, delta: number) => void;
   onRemoveItem: (bookId: string) => void;
   onBack: () => void;
@@ -16,6 +19,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple_pay' | 'google_pay' | 'cash_on_delivery'>('card');
   const [deliveryMethod, setDeliveryMethod] = useState<'nova_poshta' | 'standard'>('nova_poshta');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const subtotal = cart.reduce((acc, item) => acc + (item.book.price * item.quantity), 0);
   const shipping = deliveryMethod === 'nova_poshta' ? 80 : 0;
@@ -26,21 +30,23 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
   const textMuted = isDarkMode ? 'text-stone-500' : 'text-stone-400';
   const innerBg = isDarkMode ? 'bg-stone-950' : 'bg-stone-50';
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (cart.length === 0) return;
-    
-    // Final check for stock
+
     const outOfStock = cart.find(item => item.quantity > item.book.inventory);
     if (outOfStock) {
-      alert(`Вибачте, книга "${outOfStock.book.title}" закінчилася або доступна в меншій кількості.`);
+      setSubmitError(`Вибачте, книга "${outOfStock.book.title}" закінчилася або доступна в меншій кількості.`);
       return;
     }
 
     setIsProcessing(true);
-    setTimeout(() => {
+    setSubmitError(null);
+    try {
+      await onComplete({ paymentMethod, deliveryMethod });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Не вдалося оформити замовлення.');
       setIsProcessing(false);
-      onComplete();
-    }, 2000);
+    }
   };
 
   if (isProcessing) {
@@ -59,7 +65,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
     <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 animate-fadeIn pb-24">
       <div className="lg:col-span-8 space-y-12">
         <button onClick={onBack} className={`${textMuted} font-black text-[11px] uppercase tracking-[0.3em] flex items-center gap-3 transition-all ${isDarkMode ? 'hover:text-stone-100' : 'hover:text-stone-900'}`}>
-          <i className="fas fa-arrow-left text-sm"></i> Повернутися до вибору
+          <i className="fas fa-arrow-left text-sm"></i> Повернутися
         </button>
 
         {/* Delivery */}
@@ -73,14 +79,14 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
               className={`p-6 border transition text-left ${deliveryMethod === 'nova_poshta' ? (isDarkMode ? 'border-stone-300 bg-stone-800' : 'border-stone-900 bg-stone-50') : (isDarkMode ? 'border-stone-800 hover:border-stone-600' : 'border-stone-200 hover:border-stone-400')}`}
             >
               <span className={`font-bold block mb-2 uppercase text-sm tracking-widest ${isDarkMode ? 'text-stone-100' : 'text-stone-900'}`}>Нова Пошта</span>
-              <p className={`text-[10px] font-bold tracking-widest leading-relaxed uppercase ${textMuted}`}>ячс</p>
+              <p className={`text-[10px] font-bold tracking-widest leading-relaxed uppercase ${textMuted}`}>Доставка у відділення або поштомат за тарифами перевізника</p>
             </button>
             <button 
               onClick={() => setDeliveryMethod('standard')}
               className={`p-6 border transition text-left ${deliveryMethod === 'standard' ? (isDarkMode ? 'border-stone-300 bg-stone-800' : 'border-stone-900 bg-stone-50') : (isDarkMode ? 'border-stone-800 hover:border-stone-600' : 'border-stone-200 hover:border-stone-400')}`}
             >
-              <span className={`font-bold block mb-2 uppercase text-sm tracking-widest ${isDarkMode ? 'text-stone-100' : 'text-stone-900'}`}>ячс</span>
-              <p className={`text-[10px] font-bold tracking-widest leading-relaxed uppercase ${textMuted}`}>ячс</p>
+              <span className={`font-bold block mb-2 uppercase text-sm tracking-widest ${isDarkMode ? 'text-stone-100' : 'text-stone-900'}`}>Самовивіз</span>
+              <p className={`text-[10px] font-bold tracking-widest leading-relaxed uppercase ${textMuted}`}>Безкоштовно з нашого офісу після підтвердження</p>
             </button>
           </div>
         </div>
@@ -111,7 +117,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
           {paymentMethod === 'card' && (
             <div className={`mt-10 p-8 border space-y-8 animate-fadeIn ${innerBg} ${isDarkMode ? 'border-stone-800' : 'border-stone-100'}`}>
                <div>
-                  <label className={`block text-[9px] font-black uppercase tracking-[0.3em] mb-3 ${isDarkMode ? 'text-stone-600' : 'text-stone-400'}`}>Номер книги (карти)</label>
+                  <label className={`block text-[9px] font-black uppercase tracking-[0.3em] mb-3 ${isDarkMode ? 'text-stone-600' : 'text-stone-400'}`}>Номер карти</label>
                   <input placeholder="0000 0000 0000 0000" className={`w-full py-3 text-sm focus:outline-none tracking-[0.2em] bg-transparent border-b ${isDarkMode ? 'border-stone-800 text-stone-200 focus:border-stone-100' : 'border-stone-200 text-stone-800 focus:border-stone-900'}`} />
                </div>
                <div className="grid grid-cols-2 gap-8">
@@ -147,6 +153,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
                     <div className="flex items-center border border-stone-800/30">
                       <button 
                         onClick={() => onUpdateQuantity(item.book.id, -1)}
+                        disabled={isProcessing}
                         className={`px-2 py-1 text-sm hover:bg-stone-500/10 transition ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}
                       >
                         <i className="fas fa-minus"></i>
@@ -154,6 +161,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
                       <span className={`px-3 py-1 text-[11px] font-black ${isDarkMode ? 'text-stone-200' : 'text-stone-900'}`}>{item.quantity}</span>
                       <button 
                         onClick={() => onUpdateQuantity(item.book.id, 1)}
+                        disabled={isProcessing}
                         className={`px-2 py-1 text-sm hover:bg-stone-500/10 transition ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}
                       >
                         <i className="fas fa-plus"></i>
@@ -162,6 +170,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
                     
                     <button 
                       onClick={() => onRemoveItem(item.book.id)}
+                      disabled={isProcessing}
                       className={`text-[10px] font-black uppercase tracking-widest transition ${isDarkMode ? 'text-rose-900 hover:text-rose-500' : 'text-rose-400 hover:text-rose-600'}`}
                     >
                       Видалити
@@ -194,12 +203,18 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
             </div>
           </div>
 
+          {submitError && (
+            <div className={`mt-6 p-4 border text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'border-rose-900/60 text-rose-500 bg-rose-950/20' : 'border-rose-200 text-rose-700 bg-rose-50'}`}>
+              {submitError}
+            </div>
+          )}
+
           <button 
             onClick={handlePayment}
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || isProcessing}
             className={`w-full font-black py-5 mt-10 transition uppercase tracking-[0.4em] text-[11px] disabled:opacity-20 ${isDarkMode ? 'bg-stone-100 text-stone-950 hover:bg-white' : 'bg-stone-900 text-stone-100 hover:bg-black'}`}
           >
-            Оплатити
+            {isProcessing ? 'Обробка...' : 'Оплатити'}
           </button>
         </div>
       </div>

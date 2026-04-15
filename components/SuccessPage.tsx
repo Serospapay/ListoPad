@@ -28,7 +28,7 @@ const SuccessPage: React.FC<SuccessPageProps> = ({ onContinue, isDarkMode }) => 
           <div className={`p-8 border text-left ${innerBg}`}>
              <p className={`text-[10px] font-black uppercase tracking-[0.4em] mb-2 text-center ${isDarkMode ? 'text-stone-600' : 'text-stone-400'}`}>Цифровий примірник чека</p>
              <p className={`text-[9px] text-center uppercase tracking-widest leading-relaxed ${isDarkMode ? 'text-stone-700' : 'text-stone-300'}`}>
-               Цифровий чек надіслано на ваш електронну адресу. Очікуйте прибуття????
+               Цифровий чек надіслано на вашу електронну адресу. Очікуйте повідомлення про відправку.
              </p>
           </div>
         </div>

@@ -32,7 +32,7 @@ const BookDetails: React.FC<BookDetailsProps> = ({
   const specs = [
     { label: 'Кількість сторінок', value: book.pages },
     { label: 'Рік видання', value: book.year },
-    { label: 'Видавництво???', value: book.publisher },
+    { label: 'Видавництво', value: book.publisher },
     { label: 'Обкладинка', value: book.cover },
     { label: 'Формат', value: book.format },
     { label: 'Вага', value: book.weight },
@@ -175,13 +175,13 @@ const BookDetails: React.FC<BookDetailsProps> = ({
                </button>
                <div className="flex flex-col items-center md:items-start gap-2 shrink-0">
                  {book.inventory > 0 ? (
-                   <span className={`text-[12px] font-black uppercase tracking-widest ${book.inventory < 10 ? 'text-rose-500 animate-pulse' : textMuted}`}>
-                     {book.inventory < 10 ? `Лишилося ${book.inventory} примірників!` : `Доступно: ?? ${book.inventory} шт.`}
+                    <span className={`text-[12px] font-black uppercase tracking-widest ${book.inventory < 10 ? 'text-rose-500 animate-pulse' : textMuted}`}>
+                     {book.inventory < 10 ? `Лишилося ${book.inventory} примірників!` : `Доступно: ${book.inventory} шт.`}
                    </span>
                  ) : (
                    <span className="text-[12px] font-black uppercase tracking-widest text-rose-800">Скоро у наявності</span>
                  )}
-                 <p className={`text-[10px] font-bold uppercase tracking-widest opacity-40 ${isDarkMode ? 'text-stone-500' : 'text-stone-400'}`}>ячс</p>
+                 <p className={`text-[10px] font-bold uppercase tracking-widest opacity-40 ${isDarkMode ? 'text-stone-500' : 'text-stone-400'}`}>Швидка відправка по Україні</p>
                </div>
             </div>
           </div>

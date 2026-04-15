@@ -20,7 +20,7 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
   const textMuted = isDarkMode ? 'text-stone-500' : 'text-stone-400';
   const tableRowHover = isDarkMode ? 'hover:bg-stone-800/40' : 'hover:bg-stone-50';
 
-  // Суворе фільтрування замовлень поточного користувача за його ID
+  
   const userOrders = useMemo(() => {
     return orders.filter(o => o.customerId === user.id);
   }, [user.id, orders]);
@@ -55,7 +55,7 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
             {user.name}
           </h2>
           <p className={`text-[10px] font-black uppercase tracking-[0.4em] mb-2 ${textMuted}`}>
-            Користувач з {user.joinDate}
+            З нами з {user.joinDate}
           </p>
           <div className="flex flex-wrap justify-center gap-6 md:gap-10 mt-6 border-t pt-4">
              <p className={`text-[11px] font-serif italic tracking-widest ${isDarkMode ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -122,6 +122,7 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
                 <th className="px-8 py-6">Назва</th>
                 <th className="px-8 py-6">Автор</th>
                 <th className="px-8 py-6">Дата придбання</th>
+                <th className="px-8 py-6">Доставка / Оплата</th>
                 <th className="px-8 py-6 text-right">Ціна</th>
                 <th className="px-8 py-6 text-right">Статус</th>
               </tr>
@@ -140,6 +141,10 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
                     <td className={`px-8 py-8 text-[11px] tracking-widest uppercase ${isDarkMode ? 'text-stone-600' : 'text-stone-300'}`}>
                       {order.date}
                     </td>
+                    <td className={`px-8 py-8 text-[10px] tracking-wide uppercase ${isDarkMode ? 'text-stone-500' : 'text-stone-500'}`}>
+                      {order.deliveryMethod === 'nova_poshta' ? 'Нова Пошта' : 'Самовивіз'} / {order.paymentMethod === 'cash_on_delivery' ? 'При отриманні' : 'Карта'}
+                      {order.trackingNumber ? ` • ТТН ${order.trackingNumber}` : ''}
+                    </td>
                     <td className={`px-8 py-8 font-black text-right ${isDarkMode ? 'text-stone-200' : 'text-stone-900'}`}>
                       {order.amount} ₴
                     </td>
@@ -152,7 +157,7 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
                 );
               }) : (
                 <tr>
-                  <td colSpan={5} className="py-20 text-center">
+                  <td colSpan={6} className="py-20 text-center">
                     <p className={`text-[10px] font-black uppercase tracking-widest opacity-30 ${textMuted}`}>Історія порожня</p>
                   </td>
                 </tr>
