@@ -1,5 +1,5 @@
 
-import { ApiErrorShape, Book, Order, User } from '../types';
+import { ApiErrorShape, Book, Order, PromoCode, User } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
   ACCESS_TOKEN: 'lystopad_access_token',
   REFRESH_TOKEN: 'lystopad_refresh_token',
 };
+const MAX_RETRIES = 2;
 
 class ApiError extends Error {
   code: number;
@@ -59,7 +60,13 @@ const mapOrderFromApi = (apiOrder: any): Order => ({
   customerId: String(apiOrder.customerId),
   amount: Number(apiOrder.amount || 0),
   totalAmount: Number(apiOrder.totalAmount || apiOrder.amount || 0),
+  discountAmount: Number(apiOrder.discountAmount || 0),
+  promoCode: apiOrder.promoCode || '',
   date: new Date(apiOrder.date).toLocaleDateString('uk-UA'),
+  orderedAt: apiOrder.orderedAt,
+  shippedAt: apiOrder.shippedAt,
+  atBranchAt: apiOrder.atBranchAt,
+  receivedAt: apiOrder.receivedAt,
   items: (apiOrder.items || []).map((item: any) => ({
     ...item,
     id: String(item.id),
@@ -96,6 +103,9 @@ const tokenStore = {
 };
 
 const request = async <T>(path: string, init?: RequestInit, retry = true): Promise<T> => {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
   const accessToken = tokenStore.access;
   const headers = new Headers(init?.headers || {});
   if (!headers.has('Content-Type') && init?.body) headers.set('Content-Type', 'application/json');
@@ -115,6 +125,10 @@ const request = async <T>(path: string, init?: RequestInit, retry = true): Promi
   }
 
   if (!res.ok) {
+    if ((res.status === 429 || res.status >= 500) && attempt < MAX_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, 300 * (2 ** attempt)));
+      continue;
+    }
     throw new ApiError({
       detail: payload?.detail || 'Помилка запиту',
       code: payload?.code || res.status,
@@ -123,6 +137,15 @@ const request = async <T>(path: string, init?: RequestInit, retry = true): Promi
   }
 
   return payload as T;
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof TypeError) || attempt >= MAX_RETRIES) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300 * (2 ** attempt)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Network error');
 };
 
 export const apiService = {
@@ -171,9 +194,24 @@ export const apiService = {
     return mapUser(user);
   },
 
-  async getBooks(): Promise<Book[]> {
+  async getBooks(filters?: {
+    q?: string;
+    category?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    inStock?: boolean;
+    sort?: 'price_asc' | 'price_desc' | 'pages_asc' | 'pages_desc';
+  }): Promise<Book[]> {
     try {
-      const data = await request<any[]>(`/books/`);
+      const params = new URLSearchParams();
+      if (filters?.q) params.set('q', filters.q);
+      if (filters?.category) params.set('category', filters.category);
+      if (typeof filters?.minPrice === 'number') params.set('min_price', String(filters.minPrice));
+      if (typeof filters?.maxPrice === 'number') params.set('max_price', String(filters.maxPrice));
+      if (typeof filters?.inStock === 'boolean') params.set('in_stock', String(filters.inStock));
+      if (filters?.sort) params.set('sort', filters.sort);
+      const query = params.toString();
+      const data = await request<any[]>(`/books/${query ? `?${query}` : ''}`);
       const books = data.map(mapBookFromApi);
       saveToStorage(STORAGE_KEYS.BOOKS, books);
       return books;
@@ -265,6 +303,7 @@ export const apiService = {
     customerName: string;
     paymentMethod: Order['paymentMethod'];
     deliveryMethod: Order['deliveryMethod'];
+    promoCode?: string;
     items: Array<{ bookId: string; quantity: number }>;
   }): Promise<{ orderId: string; order: Order }> {
     const created = await request<any>(`/orders/checkout/`, {
@@ -273,6 +312,7 @@ export const apiService = {
         customerName: payload.customerName,
         paymentMethod: payload.paymentMethod,
         deliveryMethod: payload.deliveryMethod,
+        promoCode: payload.promoCode || '',
         items: payload.items.map((item) => ({
           bookId: Number(item.bookId),
           quantity: item.quantity,
@@ -291,5 +331,26 @@ export const apiService = {
     if (issue) {
       throw new ApiError({ detail: 'Недостатньо книг на складі для оформлення.', code: 409 });
     }
+  },
+
+  async getWishlist(): Promise<string[]> {
+    const data = await request<Array<{ id: string; bookId: number }>>(`/wishlist/`);
+    return data.map((item) => String(item.bookId));
+  },
+
+  async addWishlistItem(bookId: string): Promise<void> {
+    await request(`/wishlist/`, {
+      method: 'POST',
+      body: JSON.stringify({ bookId: Number(bookId) }),
+    });
+  },
+
+  async removeWishlistItem(bookId: string): Promise<void> {
+    await request(`/wishlist/${bookId}/`, { method: 'DELETE' });
+  },
+
+  async getPromoCodes(): Promise<PromoCode[]> {
+    const data = await request<PromoCode[]>(`/promo-codes/`);
+    return data.map((item) => ({ ...item, value: Number(item.value) }));
   },
 };

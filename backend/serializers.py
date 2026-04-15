@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Book, Category, Order, OrderItem
+from .models import Book, Category, Order, OrderItem, WishlistItem, PromoCode
 
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
@@ -47,13 +47,20 @@ class OrderSerializer(serializers.ModelSerializer):
     deliveryMethod = serializers.CharField(source='delivery_method')
     trackingNumber = serializers.CharField(source='tracking_number', allow_blank=True, allow_null=True, required=False)
     totalAmount = serializers.DecimalField(source='total_amount', max_digits=10, decimal_places=2)
+    discountAmount = serializers.DecimalField(source='discount_amount', max_digits=10, decimal_places=2)
+    promoCode = serializers.CharField(source='promo_code', allow_blank=True, required=False)
+    orderedAt = serializers.DateTimeField(source='ordered_at', required=False)
+    shippedAt = serializers.DateTimeField(source='shipped_at', required=False, allow_null=True)
+    atBranchAt = serializers.DateTimeField(source='at_branch_at', required=False, allow_null=True)
+    receivedAt = serializers.DateTimeField(source='received_at', required=False, allow_null=True)
     status = serializers.ChoiceField(choices=Order.Status.choices)
 
     class Meta:
         model = Order
         fields = [
             'id', 'customerId', 'customerName', 'bookTitle', 'amount', 'totalAmount',
-            'date', 'status', 'paymentMethod', 'deliveryMethod', 'trackingNumber'
+            'discountAmount', 'promoCode', 'date', 'orderedAt', 'shippedAt', 'atBranchAt', 'receivedAt',
+            'status', 'paymentMethod', 'deliveryMethod', 'trackingNumber'
         ]
 
 
@@ -108,6 +115,7 @@ class CheckoutCreateSerializer(serializers.Serializer):
     customerName = serializers.CharField(max_length=255, required=False, allow_blank=True)
     paymentMethod = serializers.ChoiceField(choices=Order.PaymentMethod.choices)
     deliveryMethod = serializers.ChoiceField(choices=Order.DeliveryMethod.choices)
+    promoCode = serializers.CharField(max_length=50, required=False, allow_blank=True)
     items = CheckoutItemSerializer(many=True, min_length=1)
 
 
@@ -125,3 +133,21 @@ class OrderDetailSerializer(OrderSerializer):
 
     class Meta(OrderSerializer.Meta):
         fields = OrderSerializer.Meta.fields + ['items']
+
+
+class WishlistItemSerializer(serializers.ModelSerializer):
+    bookId = serializers.IntegerField(source='book.id', read_only=True)
+
+    class Meta:
+        model = WishlistItem
+        fields = ['id', 'bookId']
+
+
+class WishlistCreateSerializer(serializers.Serializer):
+    bookId = serializers.IntegerField(min_value=1)
+
+
+class PromoCodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PromoCode
+        fields = ['code', 'discount_type', 'value', 'is_active', 'expires_at', 'max_uses', 'used_count']

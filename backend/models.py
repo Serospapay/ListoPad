@@ -62,7 +62,13 @@ class Order(models.Model):
     book_title = models.CharField(max_length=255, blank=True, default='')
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    promo_code = models.CharField(max_length=50, blank=True, default='')
     date = models.DateTimeField(auto_now_add=True)
+    ordered_at = models.DateTimeField(auto_now_add=True)
+    shipped_at = models.DateTimeField(blank=True, null=True)
+    at_branch_at = models.DateTimeField(blank=True, null=True)
+    received_at = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=50, choices=Status.choices, default=Status.ORDERED)
     payment_method = models.CharField(
         max_length=50,
@@ -94,4 +100,39 @@ class OrderItem(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['book']),
+        ]
+
+
+class WishlistItem(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wishlist_items')
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='wishlist_entries')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'book'], name='unique_user_book_wishlist'),
+        ]
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['book']),
+        ]
+
+
+class PromoCode(models.Model):
+    class DiscountType(models.TextChoices):
+        PERCENT = 'percent', 'Відсоток'
+        FIXED = 'fixed', 'Фіксована сума'
+
+    code = models.CharField(max_length=50, unique=True)
+    discount_type = models.CharField(max_length=20, choices=DiscountType.choices, default=DiscountType.PERCENT)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    is_active = models.BooleanField(default=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    max_uses = models.PositiveIntegerField(default=0)
+    used_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['code']),
+            models.Index(fields=['is_active']),
         ]

@@ -16,6 +16,15 @@ interface StorefrontProps {
   onAddToCart: (book: Book) => void;
   onGoToCheckout: () => void;
   onViewBook: (book: Book) => void;
+  onFiltersChange: (filters: {
+    q: string;
+    category: string;
+    minPrice: number;
+    maxPrice: number;
+    inStock: boolean;
+    sort: SortOption;
+  }) => Promise<void>;
+  isLoading?: boolean;
   isDarkMode: boolean;
 }
 
@@ -23,7 +32,7 @@ type SortOption = 'default' | 'price-asc' | 'price-desc' | 'pages-asc' | 'pages-
 
 const Storefront: React.FC<StorefrontProps> = ({ 
   books, categories, cart, user, wishlist, onToggleWishlist, onUpdateBook, externalCategoryFilter, onCategoryChange, onClearExternalFilter, 
-  onAddToCart, onGoToCheckout, onViewBook, isDarkMode 
+  onAddToCart, onGoToCheckout, onViewBook, onFiltersChange, isLoading = false, isDarkMode 
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const selectedCategory = externalCategoryFilter || 'Всі';
@@ -38,37 +47,7 @@ const Storefront: React.FC<StorefrontProps> = ({
 
   const allCategories = useMemo(() => ['Всі', ...categories], [categories]);
 
-  const filteredBooks = useMemo(() => {
-    let result = books.filter(book => {
-      const matchesSearch = 
-        book.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        book.author.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'Всі' || (book.categories && book.categories.includes(selectedCategory));
-      const matchesPrice = book.price >= priceMin && book.price <= priceMax;
-      const matchesAvailability = !onlyAvailable || book.inventory > 0;
-      
-      return matchesSearch && matchesCategory && matchesPrice && matchesAvailability;
-    });
-
-    switch (sortBy) {
-      case 'price-asc':
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case 'pages-asc':
-        result.sort((a, b) => a.pages - b.pages);
-        break;
-      case 'pages-desc':
-        result.sort((a, b) => b.pages - a.pages);
-        break;
-      default:
-        break;
-    }
-
-    return result;
-  }, [books, searchQuery, selectedCategory, priceMin, priceMax, onlyAvailable, sortBy]);
+  const filteredBooks = useMemo(() => books, [books]);
 
   const totalPages = Math.ceil(filteredBooks.length / BOOKS_PER_PAGE);
   const paginatedBooks = useMemo(() => {
@@ -79,6 +58,20 @@ const Storefront: React.FC<StorefrontProps> = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedCategory, priceMin, priceMax, onlyAvailable, sortBy]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void onFiltersChange({
+        q: searchQuery,
+        category: selectedCategory,
+        minPrice: priceMin,
+        maxPrice: priceMax,
+        inStock: onlyAvailable,
+        sort: sortBy,
+      });
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, selectedCategory, priceMin, priceMax, onlyAvailable, sortBy, onFiltersChange]);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -212,13 +205,24 @@ const Storefront: React.FC<StorefrontProps> = ({
           )}
         </div>
 
-        {paginatedBooks.length > 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-2 md:gap-x-10 gap-y-10 md:gap-y-20 animate-pulse">
+            {Array.from({ length: 10 }).map((_, idx) => (
+              <div key={idx} className="space-y-3">
+                <div className="aspect-[3/4.5] bg-stone-700/20"></div>
+                <div className="h-3 bg-stone-700/20"></div>
+                <div className="h-3 w-2/3 mx-auto bg-stone-700/20"></div>
+              </div>
+            ))}
+          </div>
+        ) : paginatedBooks.length > 0 ? (
           <>
             <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-2 md:gap-x-10 gap-y-10 md:gap-y-20">
               {paginatedBooks.map(book => (
                 <div key={book.id} className="group cursor-pointer relative">
                   <button 
                     onClick={(e) => { e.stopPropagation(); onToggleWishlist(book.id); }}
+                    aria-label={wishlist.includes(book.id) ? `Прибрати ${book.title} зі списку бажаного` : `Додати ${book.title} до списку бажаного`}
                     className={`absolute top-2 left-2 md:top-4 md:left-4 z-20 w-6 h-6 md:w-10 md:h-10 border flex items-center justify-center transition-all ${wishlist.includes(book.id) ? 'bg-stone-100 text-stone-950 border-stone-100' : 'bg-stone-950/40 text-white border-white/20 hover:bg-stone-100 hover:text-stone-950'}`}
                   >
                     <i className={`${wishlist.includes(book.id) ? 'fas' : 'far'} fa-star text-[8px] md:text-base`}></i>
@@ -245,6 +249,7 @@ const Storefront: React.FC<StorefrontProps> = ({
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-500">
                        <button 
                          onClick={(e) => { e.stopPropagation(); onAddToCart(book); }}
+                         aria-label={`Додати ${book.title} у кошик`}
                          className="bg-white text-stone-950 px-4 py-2 md:px-8 md:py-4 font-black text-[8px] md:text-[10px] uppercase tracking-widest shadow-2xl transform translate-y-4 group-hover:translate-y-0 transition-all duration-500"
                        >
                           У КОШИК

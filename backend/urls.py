@@ -12,7 +12,9 @@ from .views import (
     BookViewSet,
     CategoryViewSet,
     OrderViewSet,
+    PromoCodeViewSet,
     UserViewSet,
+    WishlistViewSet,
 )
 
 router = DefaultRouter()
@@ -20,6 +22,8 @@ router.register(r'books', BookViewSet)
 router.register(r'categories', CategoryViewSet)
 router.register(r'orders', OrderViewSet)
 router.register(r'users', UserViewSet)
+router.register(r'wishlist', WishlistViewSet, basename='wishlist')
+router.register(r'promo-codes', PromoCodeViewSet, basename='promo-codes')
 
 
 class HealthView(APIView):

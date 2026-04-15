@@ -70,6 +70,10 @@ npm run dev -- --host 127.0.0.1 --port 3000
 - `GET /api/orders/my/`
 - `POST /api/orders/checkout/`
 - `PATCH /api/orders/{id}/`
+- `GET /api/wishlist/`
+- `POST /api/wishlist/`
+- `DELETE /api/wishlist/{bookId}/`
+- `GET /api/promo-codes/`
 
 ## 6. Змінні середовища
 
@@ -80,6 +84,7 @@ npm run dev -- --host 127.0.0.1 --port 3000
 - `DJANGO_DEBUG`
 - `DJANGO_ALLOWED_HOSTS`
 - `CORS_ALLOWED_ORIGINS`
+- `DJANGO_LOG_LEVEL`
 
 База даних:
 
@@ -101,6 +106,11 @@ Backend тести:
 ```bash
 python manage.py test
 ```
+
+CI pipeline запускається автоматично через GitHub Actions (`.github/workflows/ci.yml`) і перевіряє:
+
+- frontend lint + build
+- backend tests
 
 ## 8. Типові проблеми
 

@@ -29,7 +29,13 @@ const App: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [storefrontGenreFilter, setStorefrontGenreFilter] = useState('Всі');
+  const [storefrontSearch, setStorefrontSearch] = useState('');
+  const [storefrontPriceMin, setStorefrontPriceMin] = useState(0);
+  const [storefrontPriceMax, setStorefrontPriceMax] = useState(2000);
+  const [storefrontOnlyAvailable, setStorefrontOnlyAvailable] = useState(false);
+  const [storefrontSort, setStorefrontSort] = useState<'default' | 'price-asc' | 'price-desc' | 'pages-asc' | 'pages-desc'>('default');
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isBooksLoading, setIsBooksLoading] = useState(false);
   const [appError, setAppError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,7 +52,14 @@ const App: React.FC = () => {
     try {
       setAppError(null);
       const [b, u, c] = await Promise.all([
-        apiService.getBooks(),
+        apiService.getBooks({
+          q: storefrontSearch,
+          category: storefrontGenreFilter === 'Всі' ? undefined : storefrontGenreFilter,
+          minPrice: storefrontPriceMin,
+          maxPrice: storefrontPriceMax,
+          inStock: storefrontOnlyAvailable || undefined,
+          sort: storefrontSort === 'default' ? undefined : storefrontSort.replace('-', '_') as 'price_asc' | 'price_desc' | 'pages_asc' | 'pages_desc',
+        }),
         apiService.getUsers(),
         apiService.getCategories()
       ]);
@@ -57,15 +70,18 @@ const App: React.FC = () => {
       console.error("API connection failed:", error);
       setAppError(error instanceof Error ? error.message : 'Помилка завантаження даних.');
     }
-  }, []);
+  }, [storefrontSearch, storefrontGenreFilter, storefrontPriceMin, storefrontPriceMax, storefrontOnlyAvailable, storefrontSort]);
 
   useEffect(() => {
     const bootstrap = async () => {
+      setIsBooksLoading(true);
       await fetchData();
       try {
         if (apiService.getTokenState().hasAccess || apiService.getTokenState().hasRefresh) {
           const me = await apiService.getMe();
           setCurrentUser(me);
+          const wishlistIds = await apiService.getWishlist();
+          setWishlist(wishlistIds);
           const scopedOrders = me.role === 'admin' ? await apiService.getOrders() : await apiService.getMyOrders();
           setAllOrders(scopedOrders);
         } else {
@@ -75,6 +91,7 @@ const App: React.FC = () => {
         await apiService.logout();
         setCurrentUser(null);
       } finally {
+        setIsBooksLoading(false);
         setIsBootstrapping(false);
       }
     };
@@ -90,6 +107,8 @@ const App: React.FC = () => {
       ]);
       setAllOrders(scopedOrders);
       setAllUsers(freshUsers);
+      const wishlistIds = await apiService.getWishlist();
+      setWishlist(wishlistIds);
     } catch (error) {
       setAppError(error instanceof Error ? error.message : 'Не вдалося оновити дані профілю.');
     }
@@ -100,6 +119,7 @@ const App: React.FC = () => {
     await apiService.logout();
     setCurrentUser(null);
     setAllOrders([]);
+    setWishlist([]);
     setActiveView('storefront');
   }, []);
 
@@ -140,11 +160,22 @@ const App: React.FC = () => {
         ? prev.map(i => i.book.id === book.id ? { ...i, quantity: i.quantity + 1 } : i)
         : [...prev, { book, quantity: 1 }];
     });
-  }, [currentUser]);
+  }, [currentUser, wishlist]);
 
-  const toggleWishlist = useCallback((id: string) => {
+  const toggleWishlist = useCallback(async (id: string) => {
     if (!currentUser) return setActiveView('auth');
-    setWishlist(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    const exists = wishlist.includes(id);
+    setWishlist(prev => exists ? prev.filter(i => i !== id) : [...prev, id]);
+    try {
+      if (exists) {
+        await apiService.removeWishlistItem(id);
+      } else {
+        await apiService.addWishlistItem(id);
+      }
+    } catch (error) {
+      setWishlist(prev => exists ? [...prev, id] : prev.filter(i => i !== id));
+      setAppError(error instanceof Error ? error.message : 'Не вдалося оновити список бажаного.');
+    }
   }, [currentUser]);
 
   const customers: Customer[] = (allUsers || []).map(user => ({
@@ -189,6 +220,7 @@ const App: React.FC = () => {
   const handleCheckoutComplete = useCallback(async (payload: {
     paymentMethod: Order['paymentMethod'];
     deliveryMethod: Order['deliveryMethod'];
+    promoCode?: string;
   }) => {
     if (!currentUser) throw new Error('Спочатку виконайте вхід.');
     await apiService.validateCart({
@@ -198,6 +230,7 @@ const App: React.FC = () => {
       customerName: currentUser.name,
       paymentMethod: payload.paymentMethod,
       deliveryMethod: payload.deliveryMethod,
+      promoCode: payload.promoCode,
       items: cart.map(item => ({ bookId: item.book.id, quantity: item.quantity })),
     });
     setAllOrders(prev => [response.order, ...prev]);
@@ -206,6 +239,38 @@ const App: React.FC = () => {
     setCart([]);
     setActiveView('success');
   }, [cart, currentUser]);
+
+  const handleStorefrontFiltersChange = useCallback(async (filters: {
+    q: string;
+    category: string;
+    minPrice: number;
+    maxPrice: number;
+    inStock: boolean;
+    sort: 'default' | 'price-asc' | 'price-desc' | 'pages-asc' | 'pages-desc';
+  }) => {
+    setStorefrontSearch(filters.q);
+    setStorefrontGenreFilter(filters.category);
+    setStorefrontPriceMin(filters.minPrice);
+    setStorefrontPriceMax(filters.maxPrice);
+    setStorefrontOnlyAvailable(filters.inStock);
+    setStorefrontSort(filters.sort);
+    setIsBooksLoading(true);
+    try {
+      const fetchedBooks = await apiService.getBooks({
+        q: filters.q,
+        category: filters.category === 'Всі' ? undefined : filters.category,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        inStock: filters.inStock || undefined,
+        sort: filters.sort === 'default' ? undefined : filters.sort.replace('-', '_') as 'price_asc' | 'price_desc' | 'pages_asc' | 'pages_desc',
+      });
+      setBooks(fetchedBooks);
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : 'Не вдалося застосувати фільтри.');
+    } finally {
+      setIsBooksLoading(false);
+    }
+  }, []);
 
   const renderView = () => {
     switch (activeView) {
@@ -223,6 +288,8 @@ const App: React.FC = () => {
           onAddToCart={addToCart} 
           onGoToCheckout={() => setActiveView('checkout')} 
           onViewBook={b => { setSelectedBook(b); setActiveView('book_details'); }} 
+          onFiltersChange={handleStorefrontFiltersChange}
+          isLoading={isBooksLoading}
           isDarkMode={isDarkMode} 
         />
       );
@@ -254,8 +321,9 @@ const App: React.FC = () => {
   return (
     <Layout activeView={activeView} setActiveView={setActiveView} user={currentUser} onLogout={handleLogout} isDarkMode={isDarkMode} toggleTheme={() => { setIsDarkMode(!isDarkMode); setCustomBg(''); }} cartCount={cart.reduce((a, i) => a + i.quantity, 0)} onCartClick={() => setActiveView('checkout')} setCustomBg={setCustomBg} customBg={customBg}>
       {isBootstrapping && (
-        <div className="p-4 mb-4 text-[10px] font-black uppercase tracking-widest opacity-60">
-          Завантаження...
+        <div className="mb-4 space-y-2 animate-pulse">
+          <div className="h-3 w-48 bg-stone-700/40"></div>
+          <div className="h-24 w-full bg-stone-700/20"></div>
         </div>
       )}
       {appError && (

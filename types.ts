@@ -51,10 +51,16 @@ export interface Order {
   date: string;
   amount: number;
    totalAmount?: number;
+  discountAmount?: number;
+  promoCode?: string;
   status: 'ordered' | 'shipping' | 'at_branch' | 'received';
   paymentMethod: 'card' | 'apple_pay' | 'google_pay' | 'cash_on_delivery';
   deliveryMethod: 'nova_poshta' | 'standard';
   trackingNumber?: string;
+  orderedAt?: string;
+  shippedAt?: string;
+  atBranchAt?: string;
+  receivedAt?: string;
   items?: OrderItem[];
 }
 
@@ -71,6 +77,16 @@ export interface ApiErrorShape {
   detail: string;
   code: number;
   fields?: Record<string, unknown>;
+}
+
+export interface PromoCode {
+  code: string;
+  discount_type: 'percent' | 'fixed';
+  value: number;
+  is_active: boolean;
+  expires_at?: string | null;
+  max_uses: number;
+  used_count: number;
 }
 
 export type ViewType = 

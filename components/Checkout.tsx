@@ -8,6 +8,7 @@ interface CheckoutProps {
   onComplete: (args: {
     paymentMethod: 'card' | 'apple_pay' | 'google_pay' | 'cash_on_delivery';
     deliveryMethod: 'nova_poshta' | 'standard';
+    promoCode?: string;
   }) => Promise<void>;
   onUpdateQuantity: (bookId: string, delta: number) => void;
   onRemoveItem: (bookId: string) => void;
@@ -20,6 +21,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
   const [deliveryMethod, setDeliveryMethod] = useState<'nova_poshta' | 'standard'>('nova_poshta');
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
 
   const subtotal = cart.reduce((acc, item) => acc + (item.book.price * item.quantity), 0);
   const shipping = deliveryMethod === 'nova_poshta' ? 80 : 0;
@@ -42,7 +44,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
     setIsProcessing(true);
     setSubmitError(null);
     try {
-      await onComplete({ paymentMethod, deliveryMethod });
+      await onComplete({ paymentMethod, deliveryMethod, promoCode: promoCode.trim().toUpperCase() });
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Не вдалося оформити замовлення.');
       setIsProcessing(false);
@@ -201,6 +203,17 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
               <span>Разом</span>
               <span>{total} ₴</span>
             </div>
+          </div>
+
+          <div className={`mt-6 p-4 border ${isDarkMode ? 'border-stone-800 bg-stone-950/30' : 'border-stone-200 bg-stone-50/80'}`}>
+            <label className={`block text-[9px] font-black uppercase tracking-[0.3em] mb-3 ${textMuted}`}>Промокод</label>
+            <input
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value)}
+              disabled={isProcessing}
+              placeholder="Введіть код"
+              className={`w-full py-3 text-sm focus:outline-none tracking-[0.2em] bg-transparent border-b ${isDarkMode ? 'border-stone-800 text-stone-200 focus:border-stone-100' : 'border-stone-200 text-stone-800 focus:border-stone-900'}`}
+            />
           </div>
 
           {submitError && (

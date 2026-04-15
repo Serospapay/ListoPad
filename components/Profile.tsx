@@ -115,7 +115,27 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
             Архів придбаних творів
           </h3>
         </div>
-        <div className="overflow-x-auto">
+        <div className="md:hidden p-6 space-y-4">
+          {userOrders.length > 0 ? userOrders.map((order) => {
+            const statusInfo = getStatusConfig(order.status);
+            return (
+              <div key={order.id} className={`border p-4 space-y-2 ${isDarkMode ? 'border-stone-800' : 'border-stone-100'}`}>
+                <p className={`font-serif-gothic italic text-lg ${textTitle}`}>{order.bookTitle}</p>
+                <p className={`text-[10px] uppercase tracking-widest ${textMuted}`}>{order.date}</p>
+                <p className={`text-[10px] uppercase tracking-wide ${textMuted}`}>
+                  {order.deliveryMethod === 'nova_poshta' ? 'Нова Пошта' : 'Самовивіз'} / {order.paymentMethod === 'cash_on_delivery' ? 'При отриманні' : 'Карта'}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className={`font-black ${textTitle}`}>{order.amount} ₴</span>
+                  <span className={`text-[8px] font-black uppercase tracking-widest px-3 py-1 border ${statusInfo.colorClass}`}>{statusInfo.label}</span>
+                </div>
+              </div>
+            );
+          }) : (
+            <p className={`text-[10px] font-black uppercase tracking-widest opacity-30 ${textMuted}`}>Історія порожня</p>
+          )}
+        </div>
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead className={`${headerBg} text-[9px] font-black uppercase tracking-[0.4em] ${isDarkMode ? 'text-stone-700' : 'text-stone-400'}`}>
               <tr>
