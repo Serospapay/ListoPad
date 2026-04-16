@@ -28,8 +28,8 @@ const Layout: React.FC<LayoutProps> = ({
   const isWidePage = activeView === 'book_details';
   const mainMaxWidth = isWidePage ? 'max-w-[1600px]' : 'max-w-[1300px]';
 
-  const headerClass = isDarkMode ? 'bg-stone-900/60 border-stone-800' : 'bg-white/40 border-stone-200';
-  const navClass = isDarkMode ? 'bg-black/80 border-stone-900' : 'bg-white/80 border-stone-200';
+  const headerClass = isDarkMode ? 'bg-zinc-950/55 border-zinc-800/60' : 'bg-stone-50/70 border-stone-200/80';
+  const navClass = isDarkMode ? 'bg-zinc-950/75 border-zinc-800/60' : 'bg-stone-50/80 border-stone-200/80';
   const footerClass = isDarkMode ? 'border-stone-900' : 'border-stone-200';
 
   const accentOptions = isDarkMode 
@@ -47,31 +47,31 @@ const Layout: React.FC<LayoutProps> = ({
       ];
 
   return (
-    <div className={`min-h-screen flex flex-col selection:bg-stone-500 selection:text-white transition-all duration-700`}>
+    <div className={`min-h-screen flex flex-col selection:bg-amber-200/20 selection:text-stone-100/90 transition-all duration-700`}>
       
       {cartCount > 0 && activeView !== 'checkout' && (
         <button 
           onClick={onCartClick}
-          className={`fixed bottom-10 right-10 px-8 py-4 shadow-2xl z-[60] flex items-center gap-4 transition transform hover:-translate-y-1 font-black uppercase text-[11px] tracking-widest border border-white/10 ${
-            isDarkMode ? 'bg-stone-100 text-stone-950' : 'bg-stone-900 text-stone-100'
+          className={`fixed bottom-8 right-6 md:bottom-10 md:right-10 px-6 md:px-8 py-4 shadow-gothic z-[60] flex items-center gap-4 transition transform hover:-translate-y-1 font-black uppercase text-[11px] tracking-[0.22em] rounded-full border ${
+            isDarkMode ? 'bg-zinc-900/60 text-stone-100/90 border-zinc-700/50 backdrop-blur-md hover:bg-zinc-900/75' : 'bg-stone-50/80 text-stone-950 border-stone-200/80'
           }`}
         >
-          <i className="fas fa-shopping-bag"></i>
+          <i className={`fas fa-shopping-bag ${isDarkMode ? 'text-amber-200/80' : 'text-stone-700'}`}></i>
           <span>Замовлення ({cartCount})</span>
         </button>
       )}
 
-      <header className={`${headerClass} backdrop-blur-md border-b px-6 py-10 relative z-50 transition-colors duration-700`}>
-        <div className="max-w-[1300px] mx-auto flex items-center justify-between relative min-h-[80px]">
+      <header className={`${headerClass} backdrop-blur-md border-b px-4 md:px-6 py-5 md:py-6 relative z-50 transition-colors duration-700`}>
+        <div className="max-w-[1300px] mx-auto flex items-center justify-between relative min-h-[64px]">
           
           <div className="flex items-center gap-3 h-10 px-2 group/theme">
             <button 
               onClick={toggleTheme}
               title="Змінити тему"
-              className={`w-10 h-10 flex items-center justify-center border transition-all duration-500 shadow-lg shrink-0 ${
+              className={`w-10 h-10 flex items-center justify-center rounded-full border transition-all duration-500 shadow-lg shrink-0 ${
                 isDarkMode 
-                ? 'bg-stone-900 border-stone-700 text-stone-400 hover:text-stone-100 hover:border-stone-500' 
-                : 'bg-white border-stone-300 text-stone-600 hover:text-stone-950 hover:border-stone-500'
+                ? 'bg-zinc-900/50 border-zinc-700/50 text-stone-200/70 hover:text-stone-100 hover:border-amber-200/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/20' 
+                : 'bg-stone-50/80 border-stone-200/80 text-stone-600 hover:text-stone-950 hover:border-stone-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400/25'
               }`}
             >
               <i className={`fas ${isDarkMode ? 'fa-sun' : 'fa-moon'} text-base`}></i>
@@ -86,7 +86,9 @@ const Layout: React.FC<LayoutProps> = ({
                   title={opt.name}
                   style={{ backgroundColor: opt.color }}
                   className={`w-6 h-6 border shadow-md hover:scale-110 transition-all duration-300 ${
-                    customBg === opt.color ? (isDarkMode ? 'border-white ring-2 ring-white/20' : 'border-black ring-2 ring-black/20') : 'border-black/10'
+                    customBg === opt.color
+                      ? (isDarkMode ? 'border-stone-100/80 ring-2 ring-amber-200/15' : 'border-stone-950/60 ring-2 ring-stone-400/25')
+                      : (isDarkMode ? 'border-zinc-700/40' : 'border-stone-300/70')
                   }`}
                 />
               ))}
@@ -105,10 +107,13 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
 
           <div className="absolute left-1/2 -translate-x-1/2">
-            <div onClick={() => handleViewChange('storefront')} className="cursor-pointer text-center group">
-              <h1 className={`text-3xl md:text-7xl font-black tracking-tighter leading-none select-none font-serif-gothic transition-all duration-1000 uppercase italic ${isDarkMode ? 'text-stone-100 group-hover:text-stone-400' : 'text-stone-900 group-hover:text-stone-600'}`}>
-                ЛистоПад
+            <div onClick={() => handleViewChange('storefront')} className="cursor-pointer text-center group select-none">
+              <h1 className={`font-serif text-base md:text-lg tracking-[0.35em] uppercase ${isDarkMode ? 'text-stone-100/90 group-hover:text-amber-200/80' : 'text-stone-950 group-hover:text-stone-700'}`}>
+                ЛИСТОПАД
               </h1>
+              <div className={`mt-1 hidden md:block text-[10px] tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/45' : 'text-stone-600/70'}`}>
+                книжкове видавництво
+              </div>
             </div>
           </div>
 
@@ -125,7 +130,11 @@ const Layout: React.FC<LayoutProps> = ({
             ) : (
               <button 
                 onClick={() => handleViewChange('auth')} 
-                className={`px-3 py-2 md:px-5 md:py-2 font-bold text-[10px] uppercase tracking-[0.1em] md:tracking-[0.3em] transition flex items-center gap-2 ${isDarkMode ? 'bg-stone-100 text-stone-950 hover:bg-white' : 'bg-stone-900 text-stone-100 hover:bg-black'}`}
+                className={`px-4 h-10 rounded-full font-medium text-[11px] uppercase tracking-[0.22em] transition flex items-center gap-2 border ${
+                  isDarkMode
+                    ? 'bg-gradient-to-b from-amber-200/10 to-zinc-950/20 border-amber-200/25 text-stone-100/90 hover:border-amber-200/40 hover:bg-amber-200/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/20'
+                    : 'bg-stone-50/80 border-stone-200/80 text-stone-950 hover:border-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400/25'
+                }`}
               >
                 <i className="fas fa-user md:hidden"></i>
                 <span className="hidden md:inline">Увійти</span>

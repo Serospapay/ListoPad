@@ -177,7 +177,11 @@ const Inventory: React.FC<InventoryProps> = ({
           <h2 className={`text-4xl font-serif-gothic font-black italic ${textTitle}`}>Склад</h2>
           <button 
             onClick={() => setShowDeficit(!showDeficit)}
-            className={`w-10 h-10 border flex items-center justify-center transition shadow-lg ${showDeficit ? 'bg-rose-700 border-rose-700 text-white' : (isDarkMode ? 'bg-stone-800 border-stone-700 text-stone-300' : 'bg-stone-50 border-stone-200 text-stone-600')}`}
+            className={`w-10 h-10 rounded-full border flex items-center justify-center transition shadow-lg ${
+              showDeficit
+                ? 'bg-rose-700 border-rose-700 text-stone-100/90'
+                : (isDarkMode ? 'bg-zinc-900/50 border-zinc-700/50 text-stone-300/70' : 'bg-stone-50 border-stone-200 text-stone-600')
+            }`}
             title="Показати дефіцитні (менше 10)"
           >
             <i className="fas fa-exclamation text-lg"></i>
@@ -212,7 +216,7 @@ const Inventory: React.FC<InventoryProps> = ({
               <div key={book.id} className={`${cardBg} border p-5 flex flex-col shadow-xl group transition duration-500 hover:scale-[1.02] ${isDarkMode ? 'hover:border-stone-500' : 'hover:border-stone-400'}`}>
                 <div className="aspect-[3/4.5] border overflow-hidden shadow-md flex-shrink-0 bg-stone-950/40 relative mb-4">
                    <img src={book.coverImage} className="w-full h-full object-cover grayscale opacity-70 group-hover:opacity-100 group-hover:grayscale-0 transition duration-700" alt={book.title} />
-                   <div className={`absolute top-0 right-0 ${book.inventory < 10 ? 'bg-rose-700' : 'bg-stone-950/80'} text-[8px] font-black text-white px-2 py-1 uppercase tracking-widest`}>
+                   <div className={`absolute top-0 right-0 ${book.inventory < 10 ? 'bg-rose-700/90' : 'bg-zinc-950/70'} text-[8px] font-black text-stone-100/90 px-2 py-1 uppercase tracking-widest`}>
                      {book.inventory > 0 ? `Склад: ${book.inventory}` : 'Скоро у наявності'}
                    </div>
                 </div>
@@ -223,7 +227,7 @@ const Inventory: React.FC<InventoryProps> = ({
                   </div>
                   <div className="flex flex-col gap-2 mt-auto pt-2 border-t border-stone-800/10">
                     <button onClick={() => openEditModal(book)} className={`w-full py-2 border text-[9px] font-black uppercase tracking-widest transition ${isDarkMode ? 'bg-stone-950/60 text-stone-400 border-stone-800 hover:text-stone-100' : 'bg-stone-50/60 text-stone-500 border-stone-200 hover:text-stone-900'}`}>Змінити</button>
-                    <button onClick={() => setBookToDelete(book)} className={`w-full py-2 border text-[9px] font-black uppercase tracking-widest transition bg-rose-900/10 text-rose-500 border-rose-900/20 hover:bg-rose-600 hover:text-white`}>Видалити</button>
+                    <button onClick={() => setBookToDelete(book)} className={`w-full py-2 border text-[9px] font-black uppercase tracking-widest transition bg-rose-900/10 text-rose-300/90 border-rose-900/20 hover:bg-rose-600 hover:text-stone-100/90`}>Видалити</button>
                   </div>
                 </div>
               </div>
@@ -281,7 +285,7 @@ const Inventory: React.FC<InventoryProps> = ({
             </p>
             <div className="flex gap-4">
               <button onClick={() => setBookToDelete(null)} className="flex-1 py-4 border text-[10px] font-black uppercase tracking-widest border-stone-700 text-stone-400 hover:bg-stone-800">Скасувати</button>
-              <button onClick={confirmDelete} className="flex-1 py-4 bg-rose-700 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600">Видалити</button>
+              <button onClick={confirmDelete} className="flex-1 py-4 bg-rose-700 text-stone-100/90 text-[10px] font-black uppercase tracking-widest hover:bg-rose-600">Видалити</button>
             </div>
           </div>
         </div>
@@ -346,7 +350,7 @@ const Inventory: React.FC<InventoryProps> = ({
                         <label key={cat} className="flex items-center gap-3 cursor-pointer group">
                           <input type="checkbox" checked={formData.categories?.includes(cat)} onChange={() => toggleGenre(cat)} className="hidden" />
                           <div className={`w-4 h-4 border flex items-center justify-center transition ${formData.categories?.includes(cat) ? (isDarkMode ? 'bg-stone-100 border-stone-100' : 'bg-stone-900 border-stone-900') : 'border-stone-500'}`}>
-                            {formData.categories?.includes(cat) && <i className={`fas fa-check text-[8px] ${isDarkMode ? 'text-stone-950' : 'text-white'}`}></i>}
+                            {formData.categories?.includes(cat) && <i className={`fas fa-check text-[8px] ${isDarkMode ? 'text-stone-950' : 'text-stone-100/90'}`}></i>}
                           </div>
                           <span className={`text-[10px] font-black uppercase tracking-widest transition ${formData.categories?.includes(cat) ? textTitle : 'opacity-40 group-hover:opacity-100'}`}>{cat}</span>
                         </label>
@@ -412,17 +416,21 @@ const Inventory: React.FC<InventoryProps> = ({
                   {formData.images?.map((img, idx) => (
                     <div key={idx} className="relative aspect-[3/4] border group overflow-hidden border-stone-800 bg-stone-950/40">
                       <img src={img} className="w-full h-full object-cover" alt="Preview" />
-                      <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition bg-black/40">
-                        <button type="button" onClick={() => moveImage(idx, 'left')} className="w-10 h-10 bg-stone-100/90 text-stone-950 flex items-center justify-center text-sm hover:bg-white transition shadow-xl"><i className="fas fa-chevron-left"></i></button>
-                        <button type="button" onClick={() => moveImage(idx, 'right')} className="w-10 h-10 bg-stone-100/90 text-stone-950 flex items-center justify-center text-sm hover:bg-white transition shadow-xl"><i className="fas fa-chevron-right"></i></button>
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition bg-zinc-950/50">
+                        <button type="button" onClick={() => moveImage(idx, 'left')} className="w-10 h-10 rounded-full bg-stone-100/90 text-stone-950 flex items-center justify-center text-sm hover:bg-stone-100 transition shadow-xl"><i className="fas fa-chevron-left"></i></button>
+                        <button type="button" onClick={() => moveImage(idx, 'right')} className="w-10 h-10 rounded-full bg-stone-100/90 text-stone-950 flex items-center justify-center text-sm hover:bg-stone-100 transition shadow-xl"><i className="fas fa-chevron-right"></i></button>
                       </div>
-                      <button type="button" onClick={() => setFormData({...formData, images: formData.images?.filter((_, i) => i !== idx)})} className="absolute top-2 right-2 w-6 h-6 bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition z-10"><i className="fas fa-times text-[11px]"></i></button>
+                      <button type="button" onClick={() => setFormData({...formData, images: formData.images?.filter((_, i) => i !== idx)})} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-600 text-stone-100/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition z-10"><i className="fas fa-times text-[11px]"></i></button>
                     </div>
                   ))}
                 </div>
               </div>
               <div className="pt-10">
-                <button type="submit" disabled={isLoadingImages} className={`w-full py-5 font-black text-[11px] uppercase tracking-widest transition shadow-2xl ${isDarkMode ? 'bg-stone-100 text-stone-950 hover:bg-white' : 'bg-stone-900 text-stone-100 hover:bg-black'}`}>Зберегти зміни</button>
+                <button type="submit" disabled={isLoadingImages} className={`w-full py-5 font-black text-[11px] uppercase tracking-widest transition shadow-2xl border ${
+                  isDarkMode
+                    ? 'border-amber-200/25 bg-gradient-to-b from-amber-200/12 to-zinc-950/25 text-stone-100/90 hover:border-amber-200/40 hover:bg-amber-200/15'
+                    : 'border-stone-200/80 bg-stone-50/80 text-stone-950 hover:border-stone-300'
+                }`}>Зберегти зміни</button>
               </div>
             </form>
           </div>

@@ -225,7 +225,11 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
           <button 
             onClick={handlePayment}
             disabled={cart.length === 0 || isProcessing}
-            className={`w-full font-black py-5 mt-10 transition uppercase tracking-[0.4em] text-[11px] disabled:opacity-20 ${isDarkMode ? 'bg-stone-100 text-stone-950 hover:bg-white' : 'bg-stone-900 text-stone-100 hover:bg-black'}`}
+            className={`w-full font-black py-5 mt-10 transition uppercase tracking-[0.4em] text-[11px] disabled:opacity-20 border ${
+              isDarkMode
+                ? 'border-amber-200/25 bg-gradient-to-b from-amber-200/12 to-zinc-950/25 text-stone-100/90 hover:border-amber-200/40 hover:bg-amber-200/15'
+                : 'border-stone-200/80 bg-stone-50/80 text-stone-950 hover:border-stone-300'
+            }`}
           >
             {isProcessing ? 'Обробка...' : 'Оплатити'}
           </button>

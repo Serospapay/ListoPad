@@ -84,111 +84,194 @@ const Storefront: React.FC<StorefrontProps> = ({
     if (onClearExternalFilter) onClearExternalFilter();
   };
 
-  const cardBg = isDarkMode ? 'bg-stone-900/40 border-stone-800' : 'bg-white/60 border-stone-300 shadow-sm';
-  const inputBg = isDarkMode ? 'bg-stone-950/60 border-stone-800 text-stone-200' : 'bg-white/80 border-stone-200 text-stone-900';
+  const cardBg = isDarkMode ? 'bg-zinc-900/35 border-zinc-700/40 shadow-gothic' : 'bg-stone-50/80 border-stone-200/80 shadow-sm';
+  const inputBg = isDarkMode ? 'bg-zinc-950/25 border-zinc-700/40 text-stone-100/85' : 'bg-white/80 border-stone-200 text-stone-900';
   const textTitle = isDarkMode ? 'text-stone-100' : 'text-stone-950';
 
   return (
     <div className="space-y-12 animate-fadeIn pb-24">
       {/* Фільтри */}
-      <section className={`${cardBg} backdrop-blur-md p-8 border shadow-xl transition-all duration-700`}>
-        <div className="space-y-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-center">
-            {/* Шукати */}
-            <div className="w-full lg:flex-1 relative">
-              <i className={`fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-sm opacity-40 ${isDarkMode ? '' : 'text-stone-900'}`}></i>
-              <input 
-                type="text" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Пошук.."
-                className={`w-full pl-12 pr-4 py-4 focus:outline-none text-sm transition font-medium ${inputBg}`}
-              />
+      <section className={`relative overflow-hidden rounded-2xl border ${cardBg} backdrop-blur-md transition-all duration-700`}>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_18%_10%,rgba(199,167,106,0.10),transparent_55%),radial-gradient(900px_circle_at_82%_25%,rgba(90,31,43,0.14),transparent_55%)]" />
+        <div className="relative p-5 md:p-6">
+          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className={`text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
+                Фільтри
+              </div>
+              <div className={`mt-1 font-serif text-lg tracking-wide ${isDarkMode ? 'text-stone-100/90' : 'text-stone-950'}`}>
+                Налаштуйте підбір книг
+              </div>
             </div>
 
-            {/* Сортування */}
-            <div className="w-full lg:w-64">
-              <select 
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className={`w-full px-6 py-4 focus:outline-none text-sm cursor-pointer font-bold ${inputBg}`}
-              >
-                <option value="default">За замовчуванням</option>
-                <option value="price-asc">Ціна: від дешевших</option>
-                <option value="price-desc">Ціна: від дорожчих</option>
-                <option value="pages-asc">Обсяг: від менших</option>
-                <option value="pages-desc">Обсяг: від більших</option>
-              </select>
-            </div>
-
-            {/* Жанри */}
-            <div className="w-full lg:w-56">
-              <select 
-                value={selectedCategory}
-                onChange={(e) => {
-                  if (onCategoryChange) onCategoryChange(e.target.value);
-                }}
-                className={`w-full px-6 py-4 focus:outline-none text-sm cursor-pointer font-bold ${inputBg}`}
-              >
-                {allCategories.map(cat => (
-                  <option key={cat} value={cat}>{cat === 'Всі' ? 'Всі жанри' : cat}</option>
-                ))}
-              </select>
-            </div>
-
-            <button 
+            <button
+              type="button"
               onClick={resetFilters}
-              className={`w-full lg:w-auto text-[11px] font-black uppercase tracking-widest transition py-4 px-6 opacity-60 hover:opacity-100 ${isDarkMode ? 'text-stone-400' : 'text-stone-900'}`}
+              className={`inline-flex h-10 items-center rounded-full border px-4 text-[11px] font-medium tracking-[0.22em] uppercase transition focus:outline-none focus-visible:ring-2 ${
+                isDarkMode
+                  ? 'border-zinc-700/50 bg-zinc-950/30 text-stone-100/75 hover:bg-zinc-950/45 hover:text-stone-100 focus-visible:ring-amber-200/20'
+                  : 'border-stone-200/80 bg-stone-50/80 text-stone-700 hover:bg-stone-50 focus-visible:ring-stone-400/25'
+              }`}
             >
               Скинути
             </button>
           </div>
 
-          <div className={`pt-6 border-t ${isDarkMode ? 'border-stone-800' : 'border-stone-200'} flex flex-col md:flex-row gap-10 items-center`}>
-            {/* Ціна */}
-            <div className="flex-1 w-full space-y-3">
-               <div className="flex justify-between items-center mb-1">
-                 <span className={`text-[9px] font-black uppercase tracking-widest opacity-40 ${isDarkMode ? '' : 'text-stone-900'}`}>Ціна (₴)</span>
-                 <span className={`text-[11px] font-black tracking-widest ${textTitle}`}>
-                   {priceMin} — {priceMax}
-                 </span>
-               </div>
-               
-               <div className="relative w-full h-4 flex items-center">
-                  <div className={`absolute w-full h-0.5 ${isDarkMode ? 'bg-stone-800' : 'bg-stone-300'}`}></div>
-                  <div 
-                    className="absolute h-0.5 bg-stone-500 z-10"
-                    style={{
-                      left: `${(priceMin / 2000) * 100}%`,
-                      right: `${100 - (priceMax / 2000) * 100}%`
-                    }}
-                  ></div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+            {/* Пошук */}
+            <div className="md:col-span-5">
+              <label className={`block text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
+                Пошук
+              </label>
 
-                  <input 
-                    type="range" min="0" max="2000" step="50"
-                    value={priceMin} 
-                    onChange={(e) => setPriceMin(Math.min(Number(e.target.value), priceMax - 50))}
-                    className={`absolute w-full h-0.5 bg-transparent appearance-none cursor-pointer ${priceMin > 1000 ? 'z-30' : 'z-40'}`}
-                  />
-                  
-                  <input 
-                    type="range" min="0" max="2000" step="50"
-                    value={priceMax} 
-                    onChange={(e) => setPriceMax(Math.max(Number(e.target.value), priceMin + 50))}
-                    className={`absolute w-full h-0.5 bg-transparent appearance-none cursor-pointer ${priceMin > 1000 ? 'z-40' : 'z-30'}`}
-                  />
-               </div>
+              <div className={`mt-2 flex items-center gap-3 rounded-xl border px-3 py-2.5 transition focus-within:ring-2 ${inputBg} ${
+                isDarkMode
+                  ? 'focus-within:border-amber-200/35 focus-within:ring-amber-200/20'
+                  : 'focus-within:border-stone-400 focus-within:ring-stone-400/25'
+              }`}>
+                <i className={`fas fa-search text-sm ${isDarkMode ? 'text-stone-300/50' : 'text-stone-600/60'}`}></i>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Назва, автор, ISBN…"
+                  className="h-6 w-full appearance-none bg-transparent text-sm outline-none placeholder:text-stone-300/45"
+                  autoComplete="off"
+                />
+              </div>
             </div>
 
-            {/* Наявність */}
-            <div className="flex items-center gap-4 shrink-0">
-               <button 
-                 onClick={() => setOnlyAvailable(!onlyAvailable)}
-                 className={`w-12 h-6 border transition-all flex items-center p-0.5 ${onlyAvailable ? 'bg-stone-900 border-stone-900' : 'bg-transparent border-stone-400'}`}
-               >
-                  <div className={`w-4 h-4 transition-all ${onlyAvailable ? 'translate-x-6 bg-stone-100' : 'translate-x-0 bg-stone-500'}`}></div>
-               </button>
-               <span className={`text-[9px] font-black uppercase tracking-widest opacity-40 ${isDarkMode ? '' : 'text-stone-900'}`}>В наявності</span>
+            {/* Сортування */}
+            <div className="md:col-span-3">
+              <label className={`block text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
+                Сортування
+              </label>
+              <div className="relative mt-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className={`h-11 w-full appearance-none rounded-xl border px-3 pr-10 text-sm outline-none transition hover:border-zinc-700/60 focus:ring-2 ${inputBg} ${
+                    isDarkMode
+                      ? 'focus:border-amber-200/35 focus:ring-amber-200/20'
+                      : 'focus:border-stone-400 focus:ring-stone-400/25'
+                  }`}
+                >
+                  <option value="default">За замовчуванням</option>
+                  <option value="price-asc">Ціна: від дешевших</option>
+                  <option value="price-desc">Ціна: від дорожчих</option>
+                  <option value="pages-asc">Обсяг: від менших</option>
+                  <option value="pages-desc">Обсяг: від більших</option>
+                </select>
+                <div className={`pointer-events-none absolute inset-y-0 right-3 flex items-center ${isDarkMode ? 'text-stone-300/55' : 'text-stone-600/60'}`}>
+                  <i className="fas fa-chevron-down text-xs"></i>
+                </div>
+              </div>
+            </div>
+
+            {/* Жанри */}
+            <div className="md:col-span-4">
+              <label className={`block text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
+                Жанр
+              </label>
+              <div className="relative mt-2">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => {
+                    if (onCategoryChange) onCategoryChange(e.target.value);
+                  }}
+                  className={`h-11 w-full appearance-none rounded-xl border px-3 pr-10 text-sm outline-none transition hover:border-zinc-700/60 focus:ring-2 ${inputBg} ${
+                    isDarkMode
+                      ? 'focus:border-amber-200/35 focus:ring-amber-200/20'
+                      : 'focus:border-stone-400 focus:ring-stone-400/25'
+                  }`}
+                >
+                  {allCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat === 'Всі' ? 'Всі жанри' : cat}
+                    </option>
+                  ))}
+                </select>
+                <div className={`pointer-events-none absolute inset-y-0 right-3 flex items-center ${isDarkMode ? 'text-stone-300/55' : 'text-stone-600/60'}`}>
+                  <i className="fas fa-chevron-down text-xs"></i>
+                </div>
+              </div>
+            </div>
+
+            {/* Ціна + Наявність */}
+            <div className="md:col-span-12">
+              <div className={`mt-1 flex flex-col gap-4 rounded-2xl border p-4 md:flex-row md:items-center md:justify-between ${
+                isDarkMode ? 'border-zinc-700/35 bg-zinc-950/20' : 'border-stone-200/80 bg-stone-50/60'
+              }`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <div className={`text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
+                      Ціна (₴)
+                    </div>
+                    <div className={`font-serif text-base tracking-wide tabular-nums ${isDarkMode ? 'text-stone-100/90' : 'text-stone-950'}`}>
+                      {priceMin} — {priceMax}
+                    </div>
+                  </div>
+
+                  <div className="relative mt-3 h-8">
+                    <div className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 rounded-full ${isDarkMode ? 'bg-zinc-800/70' : 'bg-stone-300/70'}`} />
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-amber-200/25"
+                      style={{
+                        left: `${(priceMin / 2000) * 100}%`,
+                        right: `${100 - (priceMax / 2000) * 100}%`,
+                      }}
+                    />
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="2000"
+                      step="50"
+                      value={priceMin}
+                      onChange={(e) => setPriceMin(Math.min(Number(e.target.value), priceMax - 50))}
+                      className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 w-full ${priceMin > 1000 ? 'z-30' : 'z-40'}`}
+                    />
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="2000"
+                      step="50"
+                      value={priceMax}
+                      onChange={(e) => setPriceMax(Math.max(Number(e.target.value), priceMin + 50))}
+                      className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 w-full ${priceMin > 1000 ? 'z-40' : 'z-30'}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 md:justify-end">
+                  <div className={`text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
+                    В наявності
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={onlyAvailable}
+                    onClick={() => setOnlyAvailable(!onlyAvailable)}
+                    className={[
+                      'relative inline-flex h-10 w-16 items-center rounded-full border transition-colors focus:outline-none focus-visible:ring-2',
+                      isDarkMode ? 'focus-visible:ring-amber-200/20' : 'focus-visible:ring-stone-400/25',
+                      onlyAvailable
+                        ? (isDarkMode ? 'border-emerald-300/25 bg-emerald-400/10' : 'border-emerald-600/30 bg-emerald-600/10')
+                        : (isDarkMode ? 'border-zinc-700/50 bg-zinc-950/25' : 'border-stone-300 bg-white/70'),
+                    ].join(' ')}
+                  >
+                    <span
+                      className={[
+                        'inline-block h-8 w-8 transform rounded-full border transition-all',
+                        onlyAvailable
+                          ? 'translate-x-7 border-emerald-300/30 bg-gradient-to-b from-emerald-200/15 to-zinc-950/40'
+                          : (isDarkMode ? 'translate-x-1 border-zinc-700/50 bg-gradient-to-b from-stone-100/10 to-zinc-950/30' : 'translate-x-1 border-stone-300 bg-gradient-to-b from-stone-50 to-stone-200/60'),
+                      ].join(' ')}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -223,7 +306,11 @@ const Storefront: React.FC<StorefrontProps> = ({
                   <button 
                     onClick={(e) => { e.stopPropagation(); onToggleWishlist(book.id); }}
                     aria-label={wishlist.includes(book.id) ? `Прибрати ${book.title} зі списку бажаного` : `Додати ${book.title} до списку бажаного`}
-                    className={`absolute top-2 left-2 md:top-4 md:left-4 z-20 w-6 h-6 md:w-10 md:h-10 border flex items-center justify-center transition-all ${wishlist.includes(book.id) ? 'bg-stone-100 text-stone-950 border-stone-100' : 'bg-stone-950/40 text-white border-white/20 hover:bg-stone-100 hover:text-stone-950'}`}
+                    className={`absolute top-2 left-2 md:top-4 md:left-4 z-20 w-6 h-6 md:w-10 md:h-10 rounded-full border flex items-center justify-center transition-all ${
+                      wishlist.includes(book.id)
+                        ? 'bg-stone-100/90 text-stone-950 border-stone-100/80'
+                        : 'bg-zinc-950/35 text-stone-100/85 border-zinc-700/40 hover:bg-stone-100/90 hover:text-stone-950 hover:border-stone-100/80'
+                    }`}
                   >
                     <i className={`${wishlist.includes(book.id) ? 'fas' : 'far'} fa-star text-[8px] md:text-base`}></i>
                   </button>
@@ -234,14 +321,14 @@ const Storefront: React.FC<StorefrontProps> = ({
                       className="w-full h-full object-cover grayscale-[0.4] group-hover:grayscale-0 group-hover:scale-110 transition duration-1000" 
                       alt={book.title} 
                     />
-                    <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition duration-700"></div>
+                    <div className="absolute inset-0 bg-zinc-950/35 group-hover:bg-transparent transition duration-700"></div>
                     
-                    <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 bg-stone-950/90 backdrop-blur-md text-white px-2 py-1 md:px-4 md:py-2 border border-white/10 flex items-center gap-1 shadow-2xl">
+                    <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 bg-zinc-950/75 backdrop-blur-md text-stone-100/90 px-2 py-1 md:px-4 md:py-2 border border-zinc-700/40 flex items-center gap-1 shadow-2xl rounded-full">
                       <span className="text-[8px] md:text-[11px] font-black tracking-widest">{book.price} ₴</span>
                     </div>
 
                     {book.inventory === 0 && (
-                      <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-rose-950/90 text-white px-1.5 py-0.5 md:px-3 md:py-1 text-[6px] md:text-[8px] font-black uppercase tracking-widest shadow-xl">
+                      <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-rose-950/70 text-stone-100/90 px-2 py-1 md:px-3 md:py-1 text-[6px] md:text-[8px] font-black uppercase tracking-widest shadow-xl rounded-full border border-rose-900/30">
                         Скоро
                       </div>
                     )}
@@ -250,7 +337,7 @@ const Storefront: React.FC<StorefrontProps> = ({
                        <button 
                          onClick={(e) => { e.stopPropagation(); onAddToCart(book); }}
                          aria-label={`Додати ${book.title} у кошик`}
-                         className="bg-white text-stone-950 px-4 py-2 md:px-8 md:py-4 font-black text-[8px] md:text-[10px] uppercase tracking-widest shadow-2xl transform translate-y-4 group-hover:translate-y-0 transition-all duration-500"
+                         className="rounded-full border border-amber-200/25 bg-gradient-to-b from-amber-200/12 to-zinc-950/30 px-4 py-2 md:px-8 md:py-4 font-black text-[8px] md:text-[10px] uppercase tracking-widest text-stone-100/90 shadow-2xl transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 hover:border-amber-200/40 hover:bg-amber-200/15"
                        >
                           У КОШИК
                        </button>

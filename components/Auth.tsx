@@ -72,7 +72,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, isDarkMode }) => {
                 setIsLogin(!isLogin);
                 setError(null);
               }}
-              className={`underline underline-offset-8 transition ${isDarkMode ? 'text-stone-300 hover:text-white' : 'text-stone-700 hover:text-stone-950'}`}
+              className={`underline underline-offset-8 transition ${isDarkMode ? 'text-stone-300 hover:text-amber-200/80' : 'text-stone-700 hover:text-stone-950'}`}
             >
               {isLogin ? 'Зареєструйтесь!' : 'Увійти'}
             </button>
@@ -122,7 +122,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, isDarkMode }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-5 font-black text-[10px] transition shadow-2xl uppercase tracking-[0.5em] border ${isLoading ? 'opacity-50 cursor-not-allowed' : ''} ${isDarkMode ? 'bg-stone-100 text-stone-950 border-stone-200 hover:bg-white' : 'bg-stone-900 text-stone-100 border-stone-950 hover:bg-black'}`}
+              className={`w-full py-5 font-black text-[10px] transition shadow-2xl uppercase tracking-[0.5em] border ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              } ${
+                isDarkMode
+                  ? 'border-amber-200/25 bg-gradient-to-b from-amber-200/12 to-zinc-950/25 text-stone-100/90 hover:border-amber-200/40 hover:bg-amber-200/15'
+                  : 'border-stone-200/80 bg-stone-50/80 text-stone-950 hover:border-stone-300'
+              }`}
             >
               {isLoading ? 'ОБРОБКА...' : (isLogin ? 'УВІЙТИ' : 'ЗАРЕЄСТРУВАТИСЯ')}
             </button>

@@ -72,8 +72,8 @@ const BookDetails: React.FC<BookDetailsProps> = ({
                    className="w-full h-full object-cover grayscale-[0.1] group-hover:grayscale-0 group-hover:scale-105 transition-all duration-1000" 
                    alt={book.title} 
                  />
-                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
-                    <i className="fas fa-search-plus text-white text-3xl opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                 <div className="absolute inset-0 bg-zinc-950/0 group-hover:bg-zinc-950/15 transition flex items-center justify-center">
+                    <i className="fas fa-search-plus text-stone-100/90 text-3xl opacity-0 group-hover:opacity-100 transition-opacity"></i>
                  </div>
               </div>
 
@@ -119,7 +119,11 @@ const BookDetails: React.FC<BookDetailsProps> = ({
                   </div>
                   <button 
                     onClick={() => onToggleWishlist(book.id)}
-                    className={`flex items-center gap-4 px-8 py-4 border text-[11px] font-black uppercase tracking-widest transition-all ${isLiked ? (isDarkMode ? 'bg-stone-100 text-stone-950 border-stone-100' : 'bg-stone-900 text-white border-stone-900') : (isDarkMode ? 'border-stone-700 text-stone-500 hover:text-stone-100' : 'border-stone-300 text-stone-400 hover:text-stone-900')}`}
+                    className={`flex items-center gap-4 px-8 py-4 border text-[11px] font-black uppercase tracking-widest transition-all ${
+                      isLiked
+                        ? (isDarkMode ? 'bg-stone-100/90 text-stone-950 border-stone-100/80' : 'bg-stone-50/80 text-stone-950 border-stone-200/80')
+                        : (isDarkMode ? 'border-zinc-700/50 text-stone-300/60 hover:text-stone-100' : 'border-stone-300 text-stone-500 hover:text-stone-950')
+                    }`}
                   >
                     <i className={`${isLiked ? 'fas' : 'far'} fa-star text-base`}></i>
                     {isLiked ? 'У бажаному' : 'До бажаного'}
@@ -168,7 +172,9 @@ const BookDetails: React.FC<BookDetailsProps> = ({
                  onClick={() => onAddToCart(book)}
                  disabled={book.inventory === 0}
                  className={`flex-1 w-full px-16 py-10 font-black text-[18px] uppercase tracking-[0.8em] transition shadow-2xl disabled:opacity-30 transform hover:-translate-y-1 active:translate-y-0 ${
-                   isDarkMode ? 'bg-white text-stone-950 hover:bg-stone-200' : 'bg-stone-950 text-white hover:bg-black'
+                   isDarkMode
+                     ? 'border border-amber-200/25 bg-gradient-to-b from-amber-200/12 to-zinc-950/25 text-stone-100/90 hover:border-amber-200/40 hover:bg-amber-200/15'
+                     : 'border border-stone-200/80 bg-stone-50/80 text-stone-950 hover:border-stone-300'
                  }`}
                >
                   {book.inventory > 0 ? 'Додати до кошика' : 'Скоро у наявності'}
@@ -217,10 +223,10 @@ const BookDetails: React.FC<BookDetailsProps> = ({
       {/* Lightbox Modal */}
       {isLightboxOpen && (
         <div 
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/98 animate-fadeIn"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-950/95 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsLightboxOpen(false)}
         >
-          <button className="absolute top-10 right-10 text-white text-3xl opacity-50 hover:opacity-100 transition">
+          <button className="absolute top-10 right-10 text-stone-100/90 text-3xl opacity-50 hover:opacity-100 transition">
             <i className="fas fa-times"></i>
           </button>
           <div className="relative max-w-[95vw] max-h-[95vh] flex items-center justify-center">

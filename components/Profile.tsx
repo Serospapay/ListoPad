@@ -91,7 +91,7 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
                 {/* Wishlist Toggle Button (Star) */}
                 <button 
                   onClick={(e) => { e.stopPropagation(); onToggleWishlist(book.id); }}
-                  className={`absolute top-6 left-6 z-20 w-8 h-8 border flex items-center justify-center transition-all bg-stone-100 text-stone-950 border-stone-100 hover:bg-rose-600 hover:text-white hover:border-rose-600`}
+                  className={`absolute top-6 left-6 z-20 w-8 h-8 rounded-full border flex items-center justify-center transition-all bg-stone-100/90 text-stone-950 border-stone-100/80 hover:bg-rose-600 hover:text-stone-100/90 hover:border-rose-600`}
                   title="Видалити зі списку"
                 >
                   <i className="fas fa-star text-[10px]"></i>
