@@ -1,0 +1,9 @@
+# Основний продакшен-стек: Django 5.2 + офіційний MongoDB backend (без djongo).
+Django>=5.2,<5.3
+django-mongodb-backend==5.2.3
+pymongo>=4.7,<5.0
+python-dotenv>=1.0,<2.0
+djangorestframework>=3.15,<3.16
+django-cors-headers>=4.4,<5.0
+djangorestframework-simplejwt>=5.3,<6.0
+psycopg2-binary>=2.9,<3.0
