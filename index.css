@@ -138,6 +138,44 @@ input[type="range"]::-moz-range-thumb {
   display: none;
 }
 
+.range-thin {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  background: transparent;
+}
+
+.range-thin::-webkit-slider-runnable-track {
+  height: 2px;
+  background: rgba(113, 113, 122, 0.55);
+}
+
+.range-thin::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(228, 228, 231, 0.9);
+  margin-top: -3px;
+  border: 0;
+  cursor: pointer;
+}
+
+.range-thin::-moz-range-track {
+  height: 2px;
+  background: rgba(113, 113, 122, 0.55);
+}
+
+.range-thin::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(228, 228, 231, 0.9);
+  border: 0;
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

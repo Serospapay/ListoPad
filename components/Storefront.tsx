@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Book } from '../types';
+import StorefrontFilters from './StorefrontFilters';
 
 interface StorefrontProps {
   books: Book[];
@@ -80,8 +81,6 @@ const Storefront: React.FC<StorefrontProps> = ({
     if (onClearExternalFilter) onClearExternalFilter();
   };
 
-  const cardBg = isDarkMode ? 'bg-zinc-900/35 border-zinc-700/40 shadow-gothic' : 'bg-stone-50/80 border-stone-200/80 shadow-sm';
-  const inputBg = isDarkMode ? 'bg-zinc-950/25 border-zinc-700/40 text-stone-100/85' : 'bg-white/80 border-stone-200 text-stone-900';
   const textTitle = isDarkMode ? 'text-stone-100' : 'text-stone-950';
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
@@ -92,214 +91,41 @@ const Storefront: React.FC<StorefrontProps> = ({
     sortBy !== 'default';
 
   return (
-    <div className="space-y-12 animate-fadeIn pb-24">
-      {/* Фільтри */}
-      <section className={`relative overflow-hidden rounded-2xl border ${cardBg} backdrop-blur-md transition-all duration-700`}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_18%_10%,rgba(199,167,106,0.10),transparent_55%),radial-gradient(900px_circle_at_82%_25%,rgba(90,31,43,0.14),transparent_55%)]" />
-        <div className="relative p-5 md:p-6">
-          <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className={`text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
-                Фільтри
-              </div>
-              <div className={`mt-1 font-serif text-lg tracking-wide ${isDarkMode ? 'text-stone-100/90' : 'text-stone-950'}`}>
-                Налаштуйте підбір книг
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={resetFilters}
-              className={`inline-flex h-10 items-center rounded-full border px-4 text-[11px] font-medium tracking-[0.22em] uppercase transition focus:outline-none focus-visible:ring-2 ${
-                isDarkMode
-                  ? 'border-zinc-700/50 bg-zinc-950/30 text-stone-100/75 hover:bg-zinc-950/45 hover:text-stone-100 focus-visible:ring-amber-200/20'
-                  : 'border-stone-200/80 bg-stone-50/80 text-stone-700 hover:bg-stone-50 focus-visible:ring-stone-400/25'
-              }`}
-            >
-              Скинути
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-            {/* Пошук */}
-            <div className="md:col-span-5">
-              <label className={`block text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
-                Пошук
-              </label>
-
-              <div className={`mt-2 flex items-center gap-3 rounded-xl border px-3 py-2.5 transition focus-within:ring-2 ${inputBg} ${
-                isDarkMode
-                  ? 'focus-within:border-amber-200/35 focus-within:ring-amber-200/20'
-                  : 'focus-within:border-stone-400 focus-within:ring-stone-400/25'
-              }`}>
-                <i className={`fas fa-search text-sm ${isDarkMode ? 'text-stone-300/50' : 'text-stone-600/60'}`}></i>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Назва, автор, ISBN…"
-                  className="h-6 w-full appearance-none bg-transparent text-sm outline-none placeholder:text-stone-300/45"
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-
-            {/* Сортування */}
-            <div className="md:col-span-3">
-              <label className={`block text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
-                Сортування
-              </label>
-              <div className="relative mt-2">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  aria-label="Сортування книг"
-                  title="Сортування книг"
-                  className={`h-11 w-full appearance-none rounded-xl border px-3 pr-10 text-sm outline-none transition hover:border-zinc-700/60 focus:ring-2 ${inputBg} ${
-                    isDarkMode
-                      ? 'focus:border-amber-200/35 focus:ring-amber-200/20'
-                      : 'focus:border-stone-400 focus:ring-stone-400/25'
-                  }`}
-                >
-                  <option value="default">За замовчуванням</option>
-                  <option value="price-asc">Ціна: від дешевших</option>
-                  <option value="price-desc">Ціна: від дорожчих</option>
-                  <option value="pages-asc">Обсяг: від менших</option>
-                  <option value="pages-desc">Обсяг: від більших</option>
-                </select>
-                <div className={`pointer-events-none absolute inset-y-0 right-3 flex items-center ${isDarkMode ? 'text-stone-300/55' : 'text-stone-600/60'}`}>
-                  <i className="fas fa-chevron-down text-xs"></i>
-                </div>
-              </div>
-            </div>
-
-            {/* Жанри */}
-            <div className="md:col-span-4">
-              <label className={`block text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
-                Жанр
-              </label>
-              <div className="relative mt-2">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => {
-                    if (onCategoryChange) onCategoryChange(e.target.value);
-                  }}
-                  aria-label="Фільтр за жанром"
-                  title="Фільтр за жанром"
-                  className={`h-11 w-full appearance-none rounded-xl border px-3 pr-10 text-sm outline-none transition hover:border-zinc-700/60 focus:ring-2 ${inputBg} ${
-                    isDarkMode
-                      ? 'focus:border-amber-200/35 focus:ring-amber-200/20'
-                      : 'focus:border-stone-400 focus:ring-stone-400/25'
-                  }`}
-                >
-                  {allCategories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat === 'Всі' ? 'Всі жанри' : cat}
-                    </option>
-                  ))}
-                </select>
-                <div className={`pointer-events-none absolute inset-y-0 right-3 flex items-center ${isDarkMode ? 'text-stone-300/55' : 'text-stone-600/60'}`}>
-                  <i className="fas fa-chevron-down text-xs"></i>
-                </div>
-              </div>
-            </div>
-
-            {/* Ціна + Наявність */}
-            <div className="md:col-span-12">
-              <div className={`mt-1 flex flex-col gap-4 rounded-2xl border p-4 md:flex-row md:items-center md:justify-between ${
-                isDarkMode ? 'border-zinc-700/35 bg-zinc-950/20' : 'border-stone-200/80 bg-stone-50/60'
-              }`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-4">
-                    <div className={`text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
-                      Ціна (₴)
-                    </div>
-                    <div className={`font-serif text-base tracking-wide tabular-nums ${isDarkMode ? 'text-stone-100/90' : 'text-stone-950'}`}>
-                      {priceMin} — {priceMax}
-                    </div>
-                  </div>
-
-                  <div className="relative mt-3 h-8">
-                    <div className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 rounded-full ${isDarkMode ? 'bg-zinc-800/70' : 'bg-stone-300/70'}`} />
-                    <div
-                      className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-amber-200/25"
-                      style={{
-                        left: `${(priceMin / 2000) * 100}%`,
-                        right: `${100 - (priceMax / 2000) * 100}%`,
-                      }}
-                    />
-
-                    <input
-                      type="range"
-                      min="0"
-                      max="2000"
-                      step="50"
-                      value={priceMin}
-                      onChange={(e) => setPriceMin(Math.min(Number(e.target.value), priceMax - 50))}
-                      aria-label="Мінімальна ціна"
-                      title="Мінімальна ціна"
-                      className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 w-full ${priceMin > 1000 ? 'z-30' : 'z-40'}`}
-                    />
-
-                    <input
-                      type="range"
-                      min="0"
-                      max="2000"
-                      step="50"
-                      value={priceMax}
-                      onChange={(e) => setPriceMax(Math.max(Number(e.target.value), priceMin + 50))}
-                      aria-label="Максимальна ціна"
-                      title="Максимальна ціна"
-                      className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 w-full ${priceMin > 1000 ? 'z-40' : 'z-30'}`}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 md:justify-end">
-                  <div className={`text-[11px] font-medium tracking-[0.22em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}>
-                    В наявності
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Показувати лише книги в наявності"
-                    title="Показувати лише книги в наявності"
-                    onClick={() => setOnlyAvailable(!onlyAvailable)}
-                    className={[
-                      'relative inline-flex h-10 w-16 items-center rounded-full border transition-colors focus:outline-none focus-visible:ring-2',
-                      isDarkMode ? 'focus-visible:ring-amber-200/20' : 'focus-visible:ring-stone-400/25',
-                      onlyAvailable
-                        ? (isDarkMode ? 'border-emerald-300/25 bg-emerald-400/10' : 'border-emerald-600/30 bg-emerald-600/10')
-                        : (isDarkMode ? 'border-zinc-700/50 bg-zinc-950/25' : 'border-stone-300 bg-white/70'),
-                    ].join(' ')}
-                  >
-                    <span
-                      className={[
-                        'inline-block h-8 w-8 transform rounded-full border transition-all',
-                        onlyAvailable
-                          ? 'translate-x-7 border-emerald-300/30 bg-gradient-to-b from-emerald-200/15 to-zinc-950/40'
-                          : (isDarkMode ? 'translate-x-1 border-zinc-700/50 bg-gradient-to-b from-stone-100/10 to-zinc-950/30' : 'translate-x-1 border-stone-300 bg-gradient-to-b from-stone-50 to-stone-200/60'),
-                      ].join(' ')}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-16 animate-fadeIn pb-24">
+      <section className="pt-8 md:pt-12">
+        <h3 className={`text-3xl md:text-6xl font-serif-gothic font-black italic tracking-tight leading-[0.95] ${textTitle}`}>
+          Бібліотека Видавництва
+        </h3>
+        <div
+          aria-live="polite"
+          className={`mt-4 text-[11px] font-medium tracking-[0.16em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}
+        >
+          Знайдено: {filteredBooks.length} книг
         </div>
       </section>
 
+      <StorefrontFilters
+        isDarkMode={isDarkMode}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        selectedCategory={selectedCategory}
+        allCategories={allCategories}
+        onCategoryChange={onCategoryChange}
+        priceMin={priceMin}
+        setPriceMin={setPriceMin}
+        priceMax={priceMax}
+        setPriceMax={setPriceMax}
+        onlyAvailable={onlyAvailable}
+        setOnlyAvailable={setOnlyAvailable}
+        resetFilters={resetFilters}
+      />
+
       {/* Каталог */}
       <section>
-        <div className={`mb-12 border-b-2 pb-6 flex justify-between items-end ${isDarkMode ? 'border-stone-700' : 'border-stone-400'}`}>
-          <div>
-            <h3 className={`text-2xl md:text-5xl font-serif-gothic font-black italic tracking-tighter ${textTitle}`}>Бібліотека Видавництва</h3>
-            <div
-              aria-live="polite"
-              className={`mt-2 text-[11px] font-medium tracking-[0.14em] uppercase ${isDarkMode ? 'text-stone-300/60' : 'text-stone-600/70'}`}
-            >
-              Знайдено: {filteredBooks.length} книг
-            </div>
-          </div>
+        <div className={`mb-16 border-b pb-5 flex justify-between items-end ${isDarkMode ? 'border-zinc-800/70' : 'border-zinc-300/70'}`}>
+          <div />
           {totalPages > 1 && (
             <div className={`text-[10px] font-black uppercase tracking-widest opacity-40 ${isDarkMode ? 'text-stone-400' : 'text-stone-900'}`}>
               Сторінка {currentPage} з {totalPages}
