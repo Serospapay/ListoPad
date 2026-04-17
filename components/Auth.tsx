@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { User } from '../types';
+import React, { useEffect, useState } from 'react';
+import { DemoAuthAccount, User } from '../types';
 import { apiService } from '../services/api';
 
 interface AuthProps {
@@ -16,12 +16,31 @@ const Auth: React.FC<AuthProps> = ({ onLogin, isDarkMode }) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [demoAccounts, setDemoAccounts] = useState<DemoAuthAccount[]>([]);
+  const [isDemoLoading, setIsDemoLoading] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
 
   const cardBg = isDarkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200';
   const textTitle = isDarkMode ? 'text-stone-100' : 'text-stone-900';
   const textMuted = isDarkMode ? 'text-stone-600' : 'text-stone-400';
   const inputBorder = isDarkMode ? 'border-stone-800 focus:border-stone-100' : 'border-stone-200 focus:border-stone-900';
   const inputColor = isDarkMode ? 'text-stone-200' : 'text-stone-800';
+
+  useEffect(() => {
+    const loadDemoAccounts = async () => {
+      setIsDemoLoading(true);
+      setDemoError(null);
+      try {
+        const accounts = await apiService.getDemoAccounts();
+        setDemoAccounts(accounts);
+      } catch (err) {
+        setDemoError(err instanceof Error ? err.message : 'Не вдалося завантажити демо-акаунти.');
+      } finally {
+        setIsDemoLoading(false);
+      }
+    };
+    void loadDemoAccounts();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +97,39 @@ const Auth: React.FC<AuthProps> = ({ onLogin, isDarkMode }) => {
               {isLogin ? 'Зареєструйтесь!' : 'Увійти'}
             </button>
           </p>
+
+          <div className={`mt-6 p-4 border ${isDarkMode ? 'border-stone-800 bg-stone-950/50' : 'border-stone-200 bg-stone-50'}`}>
+            <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${textTitle}`}>Демо-користувачі</p>
+            {isDemoLoading ? (
+              <p className={`mt-2 text-[9px] uppercase tracking-[0.2em] ${textMuted}`}>Завантаження...</p>
+            ) : demoError ? (
+              <p className="mt-2 text-[9px] font-black uppercase tracking-[0.2em] text-rose-500">{demoError}</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {demoAccounts.map((account) => (
+                  <button
+                    key={account.role}
+                    type="button"
+                    onClick={() => {
+                      setEmail(account.email);
+                      setPassword(account.password);
+                      setIsLogin(true);
+                      setError(null);
+                    }}
+                    className={`w-full text-left border px-3 py-2 transition ${
+                      isDarkMode
+                        ? 'border-stone-800 hover:border-amber-200/40 hover:bg-amber-200/5'
+                        : 'border-stone-200 hover:border-stone-400 hover:bg-white'
+                    }`}
+                  >
+                    <p className={`text-[9px] uppercase tracking-[0.2em] font-black ${textMuted}`}>{account.role}</p>
+                    <p className={`mt-1 text-[10px] font-semibold ${textTitle}`}>{account.email}</p>
+                    <p className={`text-[10px] ${isDarkMode ? 'text-stone-300' : 'text-stone-700'}`}>Пароль: {account.password}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <form className="space-y-10" onSubmit={handleSubmit}>

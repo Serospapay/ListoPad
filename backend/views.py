@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib.auth.models import User
 from django.db import connection
 from django.db.models import Q, Sum
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
@@ -14,13 +15,18 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .domain.catalog import ensure_categories_exist
-from .domain.orders import OrderDomainError, create_checkout_order, update_order_status
+from .domain.demo_accounts import ensure_demo_accounts
+from .domain.orders import OrderDomainError, create_checkout_order, preview_checkout_totals, update_order_status
+from .domain.reviews import recalculate_book_rating
 from .domain.notifications import process_outbox_batch
-from .models import Book, Category, Order, PromoCode, WishlistItem
+from .models import Book, BookReview, Category, Order, PromoCode, WishlistItem
 from .pagination import OrderPagination
 from .permissions import IsAdminOnly, IsAdminOrReadOnly
 from .serializers import (
     BookSerializer,
+    BookReviewCreateSerializer,
+    BookReviewModerationSerializer,
+    BookReviewPublicSerializer,
     CategorySerializer,
     CheckoutCreateSerializer,
     MeSerializer,
@@ -50,12 +56,23 @@ class BookViewSet(viewsets.ModelViewSet):
     serializer_class = BookSerializer
     permission_classes = [IsAdminOrReadOnly]
 
+    def get_permissions(self):
+        if self.action == 'reviews':
+            if self.request.method.upper() == 'POST':
+                return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
+        return [IsAdminOrReadOnly()]
+
     def get_queryset(self):
         queryset = Book.objects.all()
         query = self.request.query_params.get('q', '').strip()
         category = self.request.query_params.get('category', '').strip()
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')
+        min_year = self.request.query_params.get('min_year')
+        max_year = self.request.query_params.get('max_year')
+        min_rating = self.request.query_params.get('min_rating')
+        publisher = self.request.query_params.get('publisher', '').strip()
         in_stock = self.request.query_params.get('in_stock')
         sort = self.request.query_params.get('sort', '').strip()
 
@@ -81,6 +98,23 @@ class BookViewSet(viewsets.ModelViewSet):
             raise ValidationError({'price_range': 'Мінімальна ціна не може бути більшою за максимальну.'})
         if in_stock == 'true':
             queryset = queryset.filter(inventory__gt=0)
+        if min_year not in (None, ''):
+            try:
+                queryset = queryset.filter(year__gte=int(min_year))
+            except (TypeError, ValueError):
+                raise ValidationError({'min_year': 'Некоректне значення мінімального року видання.'})
+        if max_year not in (None, ''):
+            try:
+                queryset = queryset.filter(year__lte=int(max_year))
+            except (TypeError, ValueError):
+                raise ValidationError({'max_year': 'Некоректне значення максимального року видання.'})
+        if min_rating not in (None, ''):
+            try:
+                queryset = queryset.filter(rating__gte=float(min_rating))
+            except (TypeError, ValueError):
+                raise ValidationError({'min_rating': 'Некоректне значення мінімального рейтингу.'})
+        if publisher:
+            queryset = queryset.filter(publisher__icontains=publisher)
 
         if sort == 'price_asc':
             queryset = queryset.order_by('price')
@@ -110,6 +144,42 @@ class BookViewSet(viewsets.ModelViewSet):
             ensure_categories_exist(category_names)
         return super().update(request, *args, **kwargs)
 
+    @action(detail=True, methods=['get', 'post'], url_path='reviews')
+    def reviews(self, request, pk=None):
+        book = self.get_object()
+
+        if request.method.upper() == 'GET':
+            rows = (
+                BookReview.objects.filter(book=book, status=BookReview.Status.APPROVED)
+                .select_related('user')
+                .order_by('-created_at')
+            )
+            return Response(BookReviewPublicSerializer(rows, many=True).data)
+
+        create_serializer = BookReviewCreateSerializer(data=request.data)
+        create_serializer.is_valid(raise_exception=True)
+        payload = create_serializer.validated_data
+        review, _ = BookReview.objects.update_or_create(
+            book=book,
+            user=request.user,
+            defaults={
+                'rating': payload['rating'],
+                'comment': payload['comment'].strip(),
+                'status': BookReview.Status.PENDING,
+                'moderation_note': '',
+                'moderated_by': None,
+                'moderated_at': None,
+            },
+        )
+        recalculate_book_rating(book)
+        return Response(
+            {
+                'detail': 'Відгук надіслано на модерацію.',
+                'review': BookReviewModerationSerializer(review).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
@@ -117,10 +187,34 @@ class OrderViewSet(viewsets.ModelViewSet):
     pagination_class = OrderPagination
 
     def get_queryset(self):
-        return Order.objects.all()
+        queryset = Order.objects.all()
+        status_filter = self.request.query_params.get('status', '').strip()
+        customer_id = self.request.query_params.get('customer_id', '').strip()
+        promo_code = self.request.query_params.get('promo_code', '').strip()
+        payment_method = self.request.query_params.get('payment_method', '').strip()
+        delivery_method = self.request.query_params.get('delivery_method', '').strip()
+        q = self.request.query_params.get('q', '').strip()
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if customer_id:
+            queryset = queryset.filter(customer_id=customer_id)
+        if promo_code:
+            queryset = queryset.filter(promo_code__iexact=promo_code)
+        if payment_method:
+            queryset = queryset.filter(payment_method=payment_method)
+        if delivery_method:
+            queryset = queryset.filter(delivery_method=delivery_method)
+        if q:
+            queryset = queryset.filter(
+                Q(customer_name__icontains=q)
+                | Q(book_title__icontains=q)
+                | Q(customer_id__icontains=q)
+            )
+        return queryset
 
     def get_permissions(self):
-        if self.action in ['checkout', 'my_orders']:
+        if self.action in ['checkout', 'checkout_preview', 'my_orders']:
             return [permissions.IsAuthenticated()]
         if self.action in ['list', 'retrieve', 'update', 'partial_update', 'destroy', 'create']:
             return [IsAdminOnly()]
@@ -154,12 +248,40 @@ class OrderViewSet(viewsets.ModelViewSet):
                 idempotency_key=idempotency_key,
             )
         except OrderDomainError as exc:
-            payload = {'detail': exc.detail}
-            payload.update(exc.fields)
-            return Response(payload, status=exc.status_code)
+            return Response(
+                {'detail': exc.detail, 'code': exc.status_code, 'fields': exc.fields},
+                status=exc.status_code,
+            )
 
         process_outbox_batch(limit=25)
         return Response({'orderId': str(order.pk), 'order': OrderDetailSerializer(order).data}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='checkout-preview')
+    def checkout_preview(self, request):
+        serializer = CheckoutCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            totals = preview_checkout_totals(
+                user=request.user,
+                delivery_method=data['deliveryMethod'],
+                promo_code=data.get('promoCode') or '',
+                items_payload=data['items'],
+            )
+        except OrderDomainError as exc:
+            return Response(
+                {'detail': exc.detail, 'code': exc.status_code, 'fields': exc.fields},
+                status=exc.status_code,
+            )
+        return Response(
+            {
+                'subtotalAmount': str(totals['subtotalAmount']),
+                'shippingAmount': str(totals['shippingAmount']),
+                'discountAmount': str(totals['discountAmount']),
+                'totalAmount': str(totals['totalAmount']),
+                'promoApplied': totals['promoApplied'],
+            }
+        )
 
     def partial_update(self, request, *args, **kwargs):
         order = self.get_object()
@@ -167,7 +289,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         try:
             update_order_status(order=order, new_status=status_value, actor=request.user)
         except OrderDomainError as exc:
-            return Response({'detail': exc.detail}, status=exc.status_code)
+            return Response(
+                {'detail': exc.detail, 'code': exc.status_code, 'fields': exc.fields},
+                status=exc.status_code,
+            )
         serializer = OrderDetailSerializer(order)
         return Response(serializer.data)
 
@@ -237,6 +362,52 @@ class AuthMeView(APIView):
 
     def get(self, request):
         return Response(MeSerializer(request.user).data)
+
+
+class AuthDemoAccountsView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+    def get(self, request):
+        accounts = ensure_demo_accounts()
+        return Response({'accounts': accounts})
+
+
+class BookReviewModerationViewSet(viewsets.ModelViewSet):
+    queryset = BookReview.objects.select_related('book', 'user', 'moderated_by').all()
+    serializer_class = BookReviewModerationSerializer
+    permission_classes = [IsAdminOnly]
+    http_method_names = ['get', 'patch']
+
+    def get_queryset(self):
+        queryset = self.queryset
+        status_filter = self.request.query_params.get('status', '').strip()
+        book_id = self.request.query_params.get('book_id', '').strip()
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if book_id:
+            queryset = queryset.filter(book__pk=book_id)
+        return queryset.order_by('-created_at')
+
+    def partial_update(self, request, *args, **kwargs):
+        review = self.get_object()
+        next_status = str(request.data.get('status', '')).strip()
+        moderation_note = str(request.data.get('moderation_note', '')).strip()
+        if next_status not in {BookReview.Status.PENDING, BookReview.Status.APPROVED, BookReview.Status.REJECTED}:
+            return Response(
+                {'detail': 'Некоректний статус модерації.', 'code': status.HTTP_400_BAD_REQUEST, 'fields': {'status': 'invalid'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        review.status = next_status
+        review.moderation_note = moderation_note
+        review.moderated_by = request.user
+        review.moderated_at = timezone.now()
+        review.save(update_fields=['status', 'moderation_note', 'moderated_by', 'moderated_at', 'updated_at'])
+        recalculate_book_rating(review.book)
+        return Response(BookReviewModerationSerializer(review).data)
 
 
 class NotificationOutboxDispatchView(APIView):

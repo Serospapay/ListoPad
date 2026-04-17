@@ -1,6 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { User, Book, Order } from '../types';
+import { withCoverFallback } from '../services/covers';
 
 interface ProfileProps {
   user: User;
@@ -107,7 +108,7 @@ const Profile: React.FC<ProfileProps> = ({ user, books, orders, isDarkMode, wish
                 </button>
 
                 <div className="aspect-[3/4.5] mb-4 overflow-hidden bg-stone-950 shadow-lg">
-                  <img src={book.coverImage} className="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition" alt={book.title} />
+                  <img src={book.coverImage} className="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition" alt={book.title} onError={withCoverFallback} />
                 </div>
                 <h4 className={`text-[10px] font-black uppercase tracking-widest line-clamp-1 ${textTitle}`}>{book.title}</h4>
                 <p className={`text-[9px] italic opacity-40 mt-1 ${textMuted}`}>{book.author}</p>

@@ -25,11 +25,13 @@ const BookDetailsRoute: React.FC<{
   books: Book[];
   wishlist: string[];
   isDarkMode: boolean;
+  currentUser: User | null;
   onToggleWishlist: (id: string) => void;
   onAddToCart: (book: Book) => void;
   onViewGenre: (g: string) => void;
   onNavigateStore: () => void;
-}> = ({ books, wishlist, isDarkMode, onToggleWishlist, onAddToCart, onViewGenre, onNavigateStore }) => {
+  onRequireAuth: () => void;
+}> = ({ books, wishlist, isDarkMode, currentUser, onToggleWishlist, onAddToCart, onViewGenre, onNavigateStore, onRequireAuth }) => {
   const { bookId } = useParams();
   const navigate = useNavigate();
   const book = books.find((b) => b.id === bookId);
@@ -48,6 +50,8 @@ const BookDetailsRoute: React.FC<{
       isDarkMode={isDarkMode}
       wishlist={wishlist}
       onToggleWishlist={onToggleWishlist}
+      currentUser={currentUser}
+      onRequireAuth={onRequireAuth}
     />
   );
 };
@@ -68,6 +72,10 @@ const App: React.FC = () => {
   const [storefrontSearch, setStorefrontSearch] = useState('');
   const [storefrontPriceMin, setStorefrontPriceMin] = useState(0);
   const [storefrontPriceMax, setStorefrontPriceMax] = useState(2000);
+  const [storefrontMinYear, setStorefrontMinYear] = useState(0);
+  const [storefrontMaxYear, setStorefrontMaxYear] = useState(0);
+  const [storefrontMinRating, setStorefrontMinRating] = useState(0);
+  const [storefrontPublisher, setStorefrontPublisher] = useState('');
   const [storefrontOnlyAvailable, setStorefrontOnlyAvailable] = useState(false);
   const [storefrontSort, setStorefrontSort] = useState<'default' | 'price-asc' | 'price-desc' | 'pages-asc' | 'pages-desc'>('default');
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -135,6 +143,10 @@ const App: React.FC = () => {
           category: storefrontGenreFilter === 'Всі' ? undefined : storefrontGenreFilter,
           minPrice: storefrontPriceMin,
           maxPrice: storefrontPriceMax,
+          minYear: storefrontMinYear || undefined,
+          maxYear: storefrontMaxYear || undefined,
+          minRating: storefrontMinRating || undefined,
+          publisher: storefrontPublisher || undefined,
           inStock: storefrontOnlyAvailable || undefined,
           sort:
             storefrontSort === 'default'
@@ -148,7 +160,7 @@ const App: React.FC = () => {
     } catch (error) {
       setAppError(error instanceof Error ? error.message : 'Помилка завантаження даних.');
     }
-  }, [storefrontSearch, storefrontGenreFilter, storefrontPriceMin, storefrontPriceMax, storefrontOnlyAvailable, storefrontSort]);
+  }, [storefrontSearch, storefrontGenreFilter, storefrontPriceMin, storefrontPriceMax, storefrontMinYear, storefrontMaxYear, storefrontMinRating, storefrontPublisher, storefrontOnlyAvailable, storefrontSort]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -367,6 +379,10 @@ const App: React.FC = () => {
       category: string;
       minPrice: number;
       maxPrice: number;
+      minYear: number;
+      maxYear: number;
+      minRating: number;
+      publisher: string;
       inStock: boolean;
       sort: 'default' | 'price-asc' | 'price-desc' | 'pages-asc' | 'pages-desc';
     }) => {
@@ -374,6 +390,10 @@ const App: React.FC = () => {
       setStorefrontGenreFilter(filters.category);
       setStorefrontPriceMin(filters.minPrice);
       setStorefrontPriceMax(filters.maxPrice);
+      setStorefrontMinYear(filters.minYear);
+      setStorefrontMaxYear(filters.maxYear);
+      setStorefrontMinRating(filters.minRating);
+      setStorefrontPublisher(filters.publisher);
       setStorefrontOnlyAvailable(filters.inStock);
       setStorefrontSort(filters.sort);
       setIsBooksLoading(true);
@@ -383,6 +403,10 @@ const App: React.FC = () => {
           category: filters.category === 'Всі' ? undefined : filters.category,
           minPrice: filters.minPrice,
           maxPrice: filters.maxPrice,
+          minYear: filters.minYear || undefined,
+          maxYear: filters.maxYear || undefined,
+          minRating: filters.minRating || undefined,
+          publisher: filters.publisher || undefined,
           inStock: filters.inStock || undefined,
           sort:
             filters.sort === 'default'
@@ -420,6 +444,9 @@ const App: React.FC = () => {
         onCartClick={() => navigate('/checkout')}
         setCustomBg={setCustomBg}
         customBg={customBg}
+        booksCount={books.length}
+        categoriesCount={categories.length}
+        wishlistCount={wishlist.length}
       >
         {isBootstrapping && (
           <div className="mb-4 space-y-2 animate-pulse">
@@ -509,10 +536,12 @@ const App: React.FC = () => {
                   books={books}
                   wishlist={wishlist}
                   isDarkMode={isDarkMode}
+                  currentUser={currentUser}
                   onToggleWishlist={toggleWishlist}
                   onAddToCart={addToCart}
                   onViewGenre={(g) => setStorefrontGenreFilter(g)}
                   onNavigateStore={() => navigate('/')}
+                  onRequireAuth={() => navigate('/auth')}
                 />
               }
             />
@@ -531,6 +560,10 @@ const App: React.FC = () => {
                     onAddBook={handleAddBook}
                     onUpdateBook={updateBook}
                     onDeleteBook={deleteBook}
+                    onRefreshBooks={async () => {
+                      const refreshedBooks = await apiService.getBooks();
+                      setBooks(refreshedBooks);
+                    }}
                     isDarkMode={isDarkMode}
                   />
                 ) : (

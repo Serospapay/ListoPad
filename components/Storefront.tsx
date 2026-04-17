@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Book } from '../types';
 import StorefrontFilters from './StorefrontFilters';
+import { withCoverFallback } from '../services/covers';
 
 interface StorefrontProps {
   books: Book[];
@@ -18,6 +19,10 @@ interface StorefrontProps {
     category: string;
     minPrice: number;
     maxPrice: number;
+    minYear: number;
+    maxYear: number;
+    minRating: number;
+    publisher: string;
     inStock: boolean;
     sort: SortOption;
   }) => Promise<void>;
@@ -35,6 +40,10 @@ const Storefront: React.FC<StorefrontProps> = ({
   const selectedCategory = externalCategoryFilter || 'Всі';
   const [priceMin, setPriceMin] = useState<number>(0);
   const [priceMax, setPriceMax] = useState<number>(2000);
+  const [minYear, setMinYear] = useState<number>(0);
+  const [maxYear, setMaxYear] = useState<number>(0);
+  const [minRating, setMinRating] = useState<number>(0);
+  const [publisherQuery, setPublisherQuery] = useState('');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('default');
   
@@ -54,7 +63,7 @@ const Storefront: React.FC<StorefrontProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, priceMin, priceMax, onlyAvailable, sortBy]);
+  }, [searchQuery, selectedCategory, priceMin, priceMax, minYear, maxYear, minRating, publisherQuery, onlyAvailable, sortBy]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -63,18 +72,26 @@ const Storefront: React.FC<StorefrontProps> = ({
         category: selectedCategory,
         minPrice: priceMin,
         maxPrice: priceMax,
+        minYear,
+        maxYear,
+        minRating,
+        publisher: publisherQuery,
         inStock: onlyAvailable,
         sort: sortBy,
       });
     }, 300);
     return () => clearTimeout(timeout);
-  }, [searchQuery, selectedCategory, priceMin, priceMax, onlyAvailable, sortBy, onFiltersChange]);
+  }, [searchQuery, selectedCategory, priceMin, priceMax, minYear, maxYear, minRating, publisherQuery, onlyAvailable, sortBy, onFiltersChange]);
 
   const resetFilters = () => {
     setSearchQuery('');
     if (onCategoryChange) onCategoryChange('Всі');
     setPriceMin(0);
     setPriceMax(2000);
+    setMinYear(0);
+    setMaxYear(0);
+    setMinRating(0);
+    setPublisherQuery('');
     setOnlyAvailable(false);
     setSortBy('default');
     setCurrentPage(1);
@@ -87,6 +104,10 @@ const Storefront: React.FC<StorefrontProps> = ({
     selectedCategory !== 'Всі' ||
     priceMin !== 0 ||
     priceMax !== 2000 ||
+    minYear !== 0 ||
+    maxYear !== 0 ||
+    minRating !== 0 ||
+    publisherQuery.trim().length > 0 ||
     onlyAvailable ||
     sortBy !== 'default';
 
@@ -117,6 +138,14 @@ const Storefront: React.FC<StorefrontProps> = ({
         setPriceMin={setPriceMin}
         priceMax={priceMax}
         setPriceMax={setPriceMax}
+        minYear={minYear}
+        setMinYear={setMinYear}
+        maxYear={maxYear}
+        setMaxYear={setMaxYear}
+        minRating={minRating}
+        setMinRating={setMinRating}
+        publisherQuery={publisherQuery}
+        setPublisherQuery={setPublisherQuery}
         onlyAvailable={onlyAvailable}
         setOnlyAvailable={setOnlyAvailable}
         resetFilters={resetFilters}
@@ -151,6 +180,21 @@ const Storefront: React.FC<StorefrontProps> = ({
             {(priceMin !== 0 || priceMax !== 2000) && (
               <span className={`px-3 py-1 rounded-full text-[10px] border ${isDarkMode ? 'border-zinc-700/50 bg-zinc-950/30 text-stone-200/80' : 'border-stone-200 bg-white/70 text-stone-700'}`}>
                 Ціна: {priceMin}–{priceMax} ₴
+              </span>
+            )}
+            {(minYear !== 0 || maxYear !== 0) && (
+              <span className={`px-3 py-1 rounded-full text-[10px] border ${isDarkMode ? 'border-zinc-700/50 bg-zinc-950/30 text-stone-200/80' : 'border-stone-200 bg-white/70 text-stone-700'}`}>
+                Рік: {minYear || '—'}–{maxYear || '—'}
+              </span>
+            )}
+            {minRating !== 0 && (
+              <span className={`px-3 py-1 rounded-full text-[10px] border ${isDarkMode ? 'border-zinc-700/50 bg-zinc-950/30 text-stone-200/80' : 'border-stone-200 bg-white/70 text-stone-700'}`}>
+                Рейтинг: від {minRating}
+              </span>
+            )}
+            {publisherQuery.trim().length > 0 && (
+              <span className={`px-3 py-1 rounded-full text-[10px] border ${isDarkMode ? 'border-zinc-700/50 bg-zinc-950/30 text-stone-200/80' : 'border-stone-200 bg-white/70 text-stone-700'}`}>
+                Видавництво: {publisherQuery}
               </span>
             )}
             {onlyAvailable && (
@@ -198,6 +242,7 @@ const Storefront: React.FC<StorefrontProps> = ({
                       src={book.coverImage} 
                       className="w-full h-full object-cover grayscale-[0.4] group-hover:grayscale-0 group-hover:scale-110 transition duration-1000" 
                       alt={book.title} 
+                      onError={withCoverFallback}
                     />
                     <div className="absolute inset-0 bg-zinc-950/35 group-hover:bg-transparent transition duration-700"></div>
                     
@@ -230,6 +275,11 @@ const Storefront: React.FC<StorefrontProps> = ({
                     </span>
                     <h4 className={`font-serif-gothic font-bold text-xs md:text-2xl italic leading-tight transition ${textTitle} group-hover:opacity-60 line-clamp-2`}>{book.title}</h4>
                     <p className={`text-[8px] md:text-[12px] italic opacity-40 ${isDarkMode ? '' : 'text-stone-900'}`}>— {book.author.split(' ').pop()} —</p>
+                    <div className={`flex items-center justify-center gap-1 text-[9px] ${isDarkMode ? 'text-amber-200' : 'text-amber-600'}`}>
+                      <i className="fas fa-star" />
+                      <span className={`font-semibold ${isDarkMode ? 'text-stone-200' : 'text-stone-800'}`}>{Number(book.rating || 0).toFixed(1)}</span>
+                      <span className={`${isDarkMode ? 'text-stone-500' : 'text-stone-500'}`}>({Number(book.reviewsCount || 0)})</span>
+                    </div>
                   </div>
                 </div>
               ))}

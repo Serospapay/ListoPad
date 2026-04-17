@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from backend.domain.events import emit_domain_event
 from backend.domain.notifications import enqueue_notification
-from backend.models import Book, InventoryMovement, Order, OrderItem, OrderStatusHistory, PromoCode
+from backend.models import Book, InventoryMovement, Order, OrderItem, OrderStatusHistory, PromoCode, PromoCodeRedemption
 
 
 class OrderDomainError(Exception):
@@ -58,7 +58,7 @@ def _resolve_books(items_payload: Iterable[dict]) -> Dict[str, Book]:
     return books_map
 
 
-def _resolve_discount(promo_code: str, subtotal_amount: Decimal) -> Tuple[Optional[PromoCode], Decimal]:
+def _resolve_discount(*, promo_code: str, subtotal_amount: Decimal, user) -> Tuple[Optional[PromoCode], Decimal]:
     if not promo_code:
         return None, Decimal('0.00')
     promo = PromoCode.objects.select_for_update().filter(code=promo_code, is_active=True).first()
@@ -68,6 +68,16 @@ def _resolve_discount(promo_code: str, subtotal_amount: Decimal) -> Tuple[Option
         raise OrderDomainError('Термін дії промокоду завершився.', status_code=400)
     if promo.max_uses > 0 and promo.used_count >= promo.max_uses:
         raise OrderDomainError('Ліміт використань промокоду вичерпано.', status_code=400)
+    if promo.min_order_amount and subtotal_amount < promo.min_order_amount:
+        raise OrderDomainError(
+            f'Промокод діє від суми {promo.min_order_amount} грн.',
+            status_code=400,
+            fields={'minOrderAmount': str(promo.min_order_amount)},
+        )
+    if promo.per_user_limit > 0:
+        current_uses = PromoCodeRedemption.objects.filter(promo_code=promo, user=user).count()
+        if current_uses >= promo.per_user_limit:
+            raise OrderDomainError('Ви вже використали цей промокод максимально можливу кількість разів.', status_code=400)
     if promo.discount_type == PromoCode.DiscountType.PERCENT:
         discount_amount = (subtotal_amount * promo.value) / Decimal('100')
     else:
@@ -105,6 +115,46 @@ def create_checkout_order(*, user, customer_name: str, payment_method: str, deli
         raise
 
 
+def preview_checkout_totals(*, user, delivery_method: str, promo_code: str, items_payload: list) -> dict:
+    normalized_items = _normalize_items_payload(items_payload)
+    books = Book.objects.filter(pk__in=[str(item['bookId']) for item in normalized_items])
+    books_map = {str(book.pk): book for book in books}
+    missing = [str(item['bookId']) for item in normalized_items if str(item['bookId']) not in books_map]
+    if missing:
+        raise OrderDomainError('Частину книг не знайдено.', status_code=400, fields={'missingBookIds': missing})
+
+    subtotal_amount = Decimal('0.00')
+    for item in normalized_items:
+        book = books_map[str(item['bookId'])]
+        quantity = item['quantity']
+        if quantity > book.inventory:
+            raise OrderDomainError(
+                f'Недостатній залишок для «{book.title}».',
+                status_code=409,
+                fields={
+                    'bookId': str(book.pk),
+                    'requested': quantity,
+                    'available': book.inventory,
+                },
+            )
+        subtotal_amount += Decimal(book.price) * quantity
+
+    shipping_amount = Decimal('80.00') if delivery_method == Order.DeliveryMethod.NOVA_POSHTA else Decimal('0.00')
+    promo, discount_amount = _resolve_discount(
+        promo_code=(promo_code or '').strip().upper(),
+        subtotal_amount=subtotal_amount,
+        user=user,
+    )
+    total_amount = max(Decimal('0.00'), subtotal_amount + shipping_amount - discount_amount)
+    return {
+        'subtotalAmount': subtotal_amount,
+        'shippingAmount': shipping_amount,
+        'discountAmount': discount_amount,
+        'totalAmount': total_amount,
+        'promoApplied': promo.code if promo else '',
+    }
+
+
 def _create_checkout_order_locked(*, user, customer_name, payment_method, delivery_method, promo_code, items_payload, normalized_key, shipping_amount) -> Order:
     with transaction.atomic():
         books_map = _resolve_books(items_payload)
@@ -132,7 +182,11 @@ def _create_checkout_order_locked(*, user, customer_name, payment_method, delive
         if insufficient_items:
             raise OrderDomainError('Недостатньо книг на складі.', status_code=409, fields={'items': insufficient_items})
 
-        promo, discount_amount = _resolve_discount((promo_code or '').strip().upper(), subtotal_amount)
+        promo, discount_amount = _resolve_discount(
+            promo_code=(promo_code or '').strip().upper(),
+            subtotal_amount=subtotal_amount,
+            user=user,
+        )
         total_amount = max(Decimal('0.00'), subtotal_amount + shipping_amount - discount_amount)
 
         order = Order.objects.create(
@@ -170,9 +224,9 @@ def _create_checkout_order_locked(*, user, customer_name, payment_method, delive
             InventoryMovement.objects.create(
                 book=book,
                 order=order,
-                movement_type=InventoryMovement.MovementType.DEBIT,
+                movement_type=InventoryMovement.MovementType.RESERVE,
                 quantity=quantity,
-                note='Checkout inventory debit',
+                note='Checkout inventory reserve',
             )
             book.refresh_from_db()
             if book.inventory <= getattr(book, 'low_stock_threshold', 3):
@@ -187,6 +241,7 @@ def _create_checkout_order_locked(*, user, customer_name, payment_method, delive
         if promo:
             promo.used_count = F('used_count') + 1
             promo.save(update_fields=['used_count'])
+            PromoCodeRedemption.objects.create(promo_code=promo, user=user, order=order)
 
         emit_domain_event(
             event_type='order_created',
@@ -225,24 +280,52 @@ def update_order_status(*, order: Order, new_status: str, actor=None) -> Order:
     previous_status = order.status
     now = timezone.now()
     with transaction.atomic():
+        if new_status == Order.Status.PAID:
+            # Confirm reserved inventory as debited stock operation.
+            for oi in order.items.select_related('book'):
+                already_debited = InventoryMovement.objects.filter(
+                    order=order,
+                    book=oi.book,
+                    movement_type=InventoryMovement.MovementType.DEBIT,
+                ).exists()
+                if not already_debited:
+                    InventoryMovement.objects.create(
+                        book=oi.book,
+                        order=order,
+                        movement_type=InventoryMovement.MovementType.DEBIT,
+                        quantity=oi.quantity,
+                        note='Оплата підтверджена — списання з резерву',
+                    )
+
         if new_status == Order.Status.CANCELLED and current_status in (
             Order.Status.ORDERED,
             Order.Status.PAID,
             Order.Status.PACKED,
         ):
-            for oi in order.items.all():
+            for oi in order.items.select_related('book'):
+                already_debited = InventoryMovement.objects.filter(
+                    order=order,
+                    book=oi.book,
+                    movement_type=InventoryMovement.MovementType.DEBIT,
+                ).exists()
                 Book.objects.filter(pk=oi.book_id).update(inventory=F('inventory') + oi.quantity)
                 InventoryMovement.objects.create(
                     book=oi.book,
                     order=order,
-                    movement_type=InventoryMovement.MovementType.RESTOCK,
+                    movement_type=InventoryMovement.MovementType.RESTOCK if already_debited else InventoryMovement.MovementType.RELEASE,
                     quantity=oi.quantity,
-                    note='Скасування замовлення — повернення на склад',
+                    note='Скасування замовлення — повернення зі складу/резерву',
                 )
 
         order.status = new_status
         updated_fields = ['status']
-        if new_status == Order.Status.SHIPPED:
+        if new_status == Order.Status.PAID:
+            order.paid_at = now
+            updated_fields.append('paid_at')
+        elif new_status == Order.Status.PACKED:
+            order.packed_at = now
+            updated_fields.append('packed_at')
+        elif new_status == Order.Status.SHIPPED:
             order.shipped_at = now
             updated_fields.append('shipped_at')
         elif new_status == Order.Status.DELIVERED:

@@ -1,7 +1,29 @@
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Book, Category, Order, OrderItem, WishlistItem, PromoCode
+from urllib.parse import quote
+from .models import Book, BookReview, Category, Order, OrderItem, WishlistItem, PromoCode, OrderStatusHistory
+
+
+DEFAULT_COVER_SVG = """
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f2937"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <rect x="48" y="48" width="504" height="804" fill="none" stroke="#374151" stroke-width="2"/>
+  <text x="300" y="430" text-anchor="middle" fill="#e5e7eb" font-family="Arial, sans-serif" font-size="42" font-weight="700">
+    NO COVER
+  </text>
+  <text x="300" y="485" text-anchor="middle" fill="#9ca3af" font-family="Arial, sans-serif" font-size="24">
+    Image unavailable
+  </text>
+</svg>
+""".strip()
+DEFAULT_COVER_IMAGE = f"data:image/svg+xml;charset=UTF-8,{quote(DEFAULT_COVER_SVG)}"
 
 class UserSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
@@ -28,7 +50,8 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class BookSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
-    coverImage = serializers.CharField(source='cover_image')
+    coverImage = serializers.SerializerMethodField()
+    reviewsCount = serializers.IntegerField(source='review_count', read_only=True)
     categories = serializers.SlugRelatedField(
         many=True, 
         slug_field='name', 
@@ -40,8 +63,14 @@ class BookSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'author', 'price', 'inventory', 'low_stock_threshold',
             'description', 'coverImage', 'categories', 'pages',
-            'year', 'publisher', 'cover', 'format', 'weight', 'rating'
+            'year', 'publisher', 'cover', 'format', 'weight', 'rating', 'reviewsCount'
         ]
+
+    def get_coverImage(self, obj):
+        cover_url = (obj.cover_image or '').strip()
+        if cover_url.startswith(('http://', 'https://', 'data:image/')):
+            return cover_url
+        return DEFAULT_COVER_IMAGE
 
 class OrderSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
@@ -57,6 +86,8 @@ class OrderSerializer(serializers.ModelSerializer):
     discountAmount = serializers.DecimalField(source='discount_amount', max_digits=10, decimal_places=2)
     promoCode = serializers.CharField(source='promo_code', allow_blank=True, required=False)
     orderedAt = serializers.DateTimeField(source='ordered_at', required=False)
+    paidAt = serializers.DateTimeField(source='paid_at', required=False, allow_null=True)
+    packedAt = serializers.DateTimeField(source='packed_at', required=False, allow_null=True)
     shippedAt = serializers.DateTimeField(source='shipped_at', required=False, allow_null=True)
     atBranchAt = serializers.DateTimeField(source='at_branch_at', required=False, allow_null=True)
     receivedAt = serializers.DateTimeField(source='received_at', required=False, allow_null=True)
@@ -69,7 +100,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'customerId', 'customerName', 'bookTitle', 'amount', 'subtotalAmount', 'shippingAmount', 'totalAmount',
-            'discountAmount', 'promoCode', 'date', 'orderedAt', 'shippedAt', 'atBranchAt', 'receivedAt',
+            'discountAmount', 'promoCode', 'date', 'orderedAt', 'paidAt', 'packedAt', 'shippedAt', 'atBranchAt', 'receivedAt',
             'deliveredAt', 'closedAt', 'cancelledAt',
             'status', 'paymentMethod', 'deliveryMethod', 'trackingNumber'
         ]
@@ -144,9 +175,26 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderDetailSerializer(OrderSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    statusHistory = serializers.SerializerMethodField()
 
     class Meta(OrderSerializer.Meta):
-        fields = OrderSerializer.Meta.fields + ['items']
+        fields = OrderSerializer.Meta.fields + ['items', 'statusHistory']
+
+    def get_statusHistory(self, obj):
+        rows = (
+            OrderStatusHistory.objects.filter(order=obj)
+            .select_related('changed_by')
+            .order_by('-changed_at')
+        )
+        return [
+            {
+                'fromStatus': row.from_status,
+                'toStatus': row.to_status,
+                'changedAt': row.changed_at,
+                'changedBy': row.changed_by.get_full_name() if row.changed_by else '',
+            }
+            for row in rows
+        ]
 
 
 class WishlistItemSerializer(serializers.ModelSerializer):
@@ -165,4 +213,73 @@ class WishlistCreateSerializer(serializers.Serializer):
 class PromoCodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PromoCode
-        fields = ['code', 'discount_type', 'value', 'is_active', 'expires_at', 'max_uses', 'used_count']
+        fields = [
+            'code',
+            'discount_type',
+            'value',
+            'is_active',
+            'expires_at',
+            'max_uses',
+            'used_count',
+            'min_order_amount',
+            'per_user_limit',
+        ]
+
+
+class BookReviewPublicSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    userName = serializers.SerializerMethodField()
+    createdAt = serializers.DateTimeField(source='created_at')
+
+    class Meta:
+        model = BookReview
+        fields = ['id', 'rating', 'comment', 'userName', 'createdAt']
+
+    def get_userName(self, obj):
+        full_name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return full_name or obj.user.username
+
+
+class BookReviewCreateSerializer(serializers.Serializer):
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    comment = serializers.CharField(max_length=2000)
+
+
+class BookReviewModerationSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    userName = serializers.SerializerMethodField()
+    userEmail = serializers.EmailField(source='user.email', read_only=True)
+    bookId = serializers.CharField(source='book.id', read_only=True)
+    bookTitle = serializers.CharField(source='book.title', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+    moderatedAt = serializers.DateTimeField(source='moderated_at', read_only=True)
+    moderatedBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BookReview
+        fields = [
+            'id',
+            'bookId',
+            'bookTitle',
+            'userName',
+            'userEmail',
+            'rating',
+            'comment',
+            'status',
+            'moderation_note',
+            'createdAt',
+            'updatedAt',
+            'moderatedAt',
+            'moderatedBy',
+        ]
+
+    def get_userName(self, obj):
+        full_name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return full_name or obj.user.username
+
+    def get_moderatedBy(self, obj):
+        if not obj.moderated_by:
+            return ''
+        full_name = f"{obj.moderated_by.first_name} {obj.moderated_by.last_name}".strip()
+        return full_name or obj.moderated_by.username

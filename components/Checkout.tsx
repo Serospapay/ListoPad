@@ -1,6 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CartItem, User } from '../types';
+import { withCoverFallback } from '../services/covers';
+import { apiService } from '../services/api';
 
 interface CheckoutProps {
   cart: CartItem[];
@@ -25,15 +27,60 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewTotals, setPreviewTotals] = useState<{
+    subtotalAmount: number;
+    shippingAmount: number;
+    discountAmount: number;
+    totalAmount: number;
+    promoApplied: string;
+  } | null>(null);
 
-  const subtotal = cart.reduce((acc, item) => acc + (item.book.price * item.quantity), 0);
-  const shipping = deliveryMethod === 'nova_poshta' ? 80 : 0;
-  const total = subtotal + shipping;
+  const fallbackSubtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.book.price * item.quantity), 0), [cart]);
+  const fallbackShipping = deliveryMethod === 'nova_poshta' ? 80 : 0;
+  const subtotal = previewTotals?.subtotalAmount ?? fallbackSubtotal;
+  const shipping = previewTotals?.shippingAmount ?? fallbackShipping;
+  const discount = previewTotals?.discountAmount ?? 0;
+  const total = previewTotals?.totalAmount ?? (fallbackSubtotal + fallbackShipping);
 
   const cardBg = isDarkMode ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200';
   const textTitle = isDarkMode ? 'text-stone-100' : 'text-stone-900';
   const textMuted = isDarkMode ? 'text-stone-500' : 'text-stone-400';
   const innerBg = isDarkMode ? 'bg-stone-950' : 'bg-stone-50';
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      setPreviewTotals(null);
+      setPreviewError(null);
+      setIsPreviewLoading(false);
+      return;
+    }
+    let isActive = true;
+    const timer = window.setTimeout(async () => {
+      setIsPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        const totals = await apiService.previewCheckout({
+          deliveryMethod,
+          promoCode: promoCode.trim().toUpperCase(),
+          items: cart.map((item) => ({ bookId: item.book.id, quantity: item.quantity })),
+        });
+        if (!isActive) return;
+        setPreviewTotals(totals);
+      } catch (error) {
+        if (!isActive) return;
+        setPreviewTotals(null);
+        setPreviewError(error instanceof Error ? error.message : 'Не вдалося перерахувати підсумки.');
+      } finally {
+        if (isActive) setIsPreviewLoading(false);
+      }
+    }, 250);
+    return () => {
+      isActive = false;
+      window.clearTimeout(timer);
+    };
+  }, [cart, deliveryMethod, promoCode]);
 
   const handlePayment = async () => {
     if (cart.length === 0) return;
@@ -167,7 +214,7 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
             {cart.length > 0 ? cart.map(item => (
               <div key={item.book.id} className="flex gap-4 items-start border-b pb-4 border-stone-800/20 last:border-0">
                 <div className={`w-14 h-20 border flex-shrink-0 ${isDarkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-100'}`}>
-                  <img src={item.book.coverImage} className="w-full h-full object-cover grayscale opacity-50" alt={item.book.title} />
+                  <img src={item.book.coverImage} className="w-full h-full object-cover grayscale opacity-50" alt={item.book.title} onError={withCoverFallback} />
                 </div>
                 <div className="flex-1 space-y-2">
                   <p className={`text-[11px] font-black line-clamp-1 uppercase tracking-widest ${isDarkMode ? 'text-stone-200' : 'text-stone-900'}`}>{item.book.title}</p>
@@ -225,6 +272,12 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
               <span>Доставка</span>
               <span className={isDarkMode ? 'text-stone-300' : 'text-stone-700'}>{shipping} ₴</span>
             </div>
+            {discount > 0 && (
+              <div className={`flex justify-between text-[10px] font-black uppercase tracking-[0.2em] ${textMuted}`}>
+                <span>Знижка</span>
+                <span className="text-emerald-500">- {discount} ₴</span>
+              </div>
+            )}
             <div className={`flex justify-between text-3xl font-serif-gothic italic font-black pt-4 ${textTitle}`}>
               <span>Разом</span>
               <span>{total} ₴</span>
@@ -240,6 +293,17 @@ const Checkout: React.FC<CheckoutProps> = ({ cart, onComplete, onUpdateQuantity,
               placeholder="Введіть код"
               className={`w-full py-3 text-sm focus:outline-none tracking-[0.2em] bg-transparent border-b ${isDarkMode ? 'border-stone-800 text-stone-200 focus:border-stone-100' : 'border-stone-200 text-stone-800 focus:border-stone-900'}`}
             />
+            {isPreviewLoading && (
+              <p className={`mt-3 text-[10px] font-black uppercase tracking-widest ${textMuted}`}>Перерахунок знижки...</p>
+            )}
+            {!isPreviewLoading && previewTotals?.promoApplied && (
+              <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                Промокод застосовано: {previewTotals.promoApplied}
+              </p>
+            )}
+            {!isPreviewLoading && promoCode.trim() && previewError && (
+              <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-rose-500">{previewError}</p>
+            )}
           </div>
 
           {submitError && (

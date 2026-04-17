@@ -1,6 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Book } from '../types';
+import { Book, BookReviewModeration } from '../types';
+import { apiService } from '../services/api';
+import { withCoverFallback } from '../services/covers';
 
 interface InventoryProps {
   books: Book[];
@@ -10,12 +12,13 @@ interface InventoryProps {
   onAddBook: (book: Book) => Promise<Book>;
   onUpdateBook: (book: Book) => Promise<void>;
   onDeleteBook: (bookId: string) => Promise<void>;
+  onRefreshBooks: () => Promise<void>;
   isDarkMode: boolean;
 }
 
 const Inventory: React.FC<InventoryProps> = ({ 
   books, categories, onUpdateCategories, onRenameCategory, 
-  onAddBook, onUpdateBook, onDeleteBook, isDarkMode 
+  onAddBook, onUpdateBook, onDeleteBook, onRefreshBooks, isDarkMode 
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenreModalOpen, setIsGenreModalOpen] = useState(false);
@@ -24,6 +27,10 @@ const Inventory: React.FC<InventoryProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
+  const [pendingReviews, setPendingReviews] = useState<BookReviewModeration[]>([]);
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false);
+  const [reviewActionId, setReviewActionId] = useState<string | null>(null);
+  const [reviewModerationError, setReviewModerationError] = useState<string | null>(null);
   
   const [inventorySearch, setInventorySearch] = useState('');
   const [showDeficit, setShowDeficit] = useState(false);
@@ -67,6 +74,46 @@ const Inventory: React.FC<InventoryProps> = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [inventorySearch, showDeficit]);
+
+  useEffect(() => {
+    let isActive = true;
+    const loadPendingReviews = async () => {
+      setIsReviewsLoading(true);
+      setReviewModerationError(null);
+      try {
+        const rows = await apiService.getReviewsForModeration({ status: 'pending' });
+        if (isActive) {
+          setPendingReviews(rows);
+        }
+      } catch (error) {
+        if (isActive) {
+          setReviewModerationError(error instanceof Error ? error.message : 'Не вдалося завантажити відгуки на модерацію.');
+        }
+      } finally {
+        if (isActive) {
+          setIsReviewsLoading(false);
+        }
+      }
+    };
+    void loadPendingReviews();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const moderateReview = async (reviewId: string, nextStatus: 'approved' | 'rejected') => {
+    setReviewActionId(reviewId);
+    setReviewModerationError(null);
+    try {
+      await apiService.moderateReview(reviewId, { status: nextStatus });
+      setPendingReviews((prev) => prev.filter((row) => row.id !== reviewId));
+      await onRefreshBooks();
+    } catch (error) {
+      setReviewModerationError(error instanceof Error ? error.message : 'Не вдалося виконати модерацію відгуку.');
+    } finally {
+      setReviewActionId(null);
+    }
+  };
 
   const confirmDelete = async () => {
     if (bookToDelete) {
@@ -194,6 +241,58 @@ const Inventory: React.FC<InventoryProps> = ({
 
   return (
     <div className="space-y-12 animate-fadeIn pb-24">
+      <section className={`border rounded-2xl p-5 md:p-6 ${isDarkMode ? 'border-stone-800 bg-stone-950/30' : 'border-stone-200 bg-white/70'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className={`text-2xl font-serif-gothic font-black italic ${textTitle}`}>Модерація відгуків</h3>
+          <span className={`text-[11px] font-black uppercase tracking-[0.16em] ${textMuted}`}>Очікують: {pendingReviews.length}</span>
+        </div>
+        {reviewModerationError && (
+          <p className="mt-3 text-[11px] font-semibold text-rose-500">{reviewModerationError}</p>
+        )}
+        <div className="mt-4 space-y-3">
+          {isReviewsLoading ? (
+            <p className={textMuted}>Завантаження черги модерації...</p>
+          ) : pendingReviews.length === 0 ? (
+            <p className={textMuted}>Немає відгуків, що очікують модерації.</p>
+          ) : (
+            pendingReviews.map((review) => (
+              <article key={review.id} className={`border rounded-xl p-4 ${isDarkMode ? 'border-stone-800 bg-stone-950/40' : 'border-stone-200 bg-stone-50/60'}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className={`text-sm font-semibold ${textTitle}`}>{review.bookTitle}</p>
+                    <p className={`text-[11px] ${textMuted}`}>{review.userName} ({review.userEmail})</p>
+                    <div className="flex items-center gap-1 text-amber-400">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <i key={`${review.id}-moderation-star-${index}`} className={`${index < review.rating ? 'fas' : 'far'} fa-star`} />
+                      ))}
+                    </div>
+                    <p className={`mt-2 whitespace-pre-line text-sm ${isDarkMode ? 'text-stone-300' : 'text-stone-700'}`}>{review.comment}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void moderateReview(review.id, 'approved')}
+                      disabled={reviewActionId === review.id}
+                      className="h-10 px-4 rounded-lg text-[10px] font-black uppercase tracking-[0.14em] bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-60"
+                    >
+                      Підтвердити
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void moderateReview(review.id, 'rejected')}
+                      disabled={reviewActionId === review.id}
+                      className="h-10 px-4 rounded-lg text-[10px] font-black uppercase tracking-[0.14em] bg-rose-600 text-white hover:bg-rose-500 transition disabled:opacity-60"
+                    >
+                      Відхилити
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+
       <div className={`flex flex-col md:flex-row justify-between items-end gap-6 border-b pb-10 ${isDarkMode ? 'border-stone-800' : 'border-stone-200'}`}>
         <div className="flex items-center gap-6">
           <h2 className={`text-4xl font-serif-gothic font-black italic ${textTitle}`}>Склад</h2>
@@ -237,7 +336,7 @@ const Inventory: React.FC<InventoryProps> = ({
             {paginatedInventory.map(book => (
               <div key={book.id} className={`${cardBg} border p-5 flex flex-col shadow-xl group transition duration-500 hover:scale-[1.02] ${isDarkMode ? 'hover:border-stone-500' : 'hover:border-stone-400'}`}>
                 <div className="aspect-[3/4.5] border overflow-hidden shadow-md flex-shrink-0 bg-stone-950/40 relative mb-4">
-                   <img src={book.coverImage} className="w-full h-full object-cover grayscale opacity-70 group-hover:opacity-100 group-hover:grayscale-0 transition duration-700" alt={book.title} />
+                  <img src={book.coverImage} className="w-full h-full object-cover grayscale opacity-70 group-hover:opacity-100 group-hover:grayscale-0 transition duration-700" alt={book.title} onError={withCoverFallback} />
                    <div className={`absolute top-0 right-0 ${book.inventory < 10 ? 'bg-rose-700/90' : 'bg-zinc-950/70'} text-[8px] font-black text-stone-100/90 px-2 py-1 uppercase tracking-widest`}>
                      {book.inventory > 0 ? `Склад: ${book.inventory}` : 'Скоро у наявності'}
                    </div>
@@ -330,6 +429,8 @@ const Inventory: React.FC<InventoryProps> = ({
                 <div key={cat} className="flex items-center justify-between group">
                   {genreEditName?.old === cat ? (
                     <input 
+                      aria-label="Редагування назви жанру"
+                      placeholder="Назва жанру"
                       autoFocus className={inputClass} value={genreEditName.new}
                       onChange={e => setGenreEditName({...genreEditName, new: e.target.value})}
                       onBlur={() => { if (genreEditName.new.trim() && genreEditName.new !== cat) onRenameCategory(cat, genreEditName.new); setGenreEditName(null); }}

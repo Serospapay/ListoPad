@@ -1,5 +1,5 @@
 
-import { ApiErrorShape, Book, Order, PromoCode, User } from '../types';
+import { ApiErrorShape, Book, BookReview, BookReviewModeration, DemoAuthAccount, Order, PromoCode, User } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
@@ -65,6 +65,7 @@ const mapBookFromApi = (apiBook: any): Book => ({
   ...apiBook,
   id: String(apiBook.id),
   low_stock_threshold: typeof apiBook.low_stock_threshold === 'number' ? apiBook.low_stock_threshold : 3,
+  reviewsCount: Number(apiBook.reviewsCount ?? apiBook.review_count ?? 0),
 });
 
 const mapBookToApi = (book: Partial<Book>) => {
@@ -84,6 +85,8 @@ const mapOrderFromApi = (apiOrder: any): Order => ({
   promoCode: apiOrder.promoCode || '',
   date: new Date(apiOrder.date).toLocaleDateString('uk-UA'),
   orderedAt: apiOrder.orderedAt,
+  paidAt: apiOrder.paidAt,
+  packedAt: apiOrder.packedAt,
   shippedAt: apiOrder.shippedAt,
   atBranchAt: apiOrder.atBranchAt,
   receivedAt: apiOrder.receivedAt,
@@ -98,6 +101,12 @@ const mapOrderFromApi = (apiOrder: any): Order => ({
     unit_price: Number(item.unit_price),
     line_total: Number(item.line_total),
   })),
+  statusHistory: (apiOrder.statusHistory || []).map((row: any) => ({
+    fromStatus: row.fromStatus,
+    toStatus: row.toStatus,
+    changedAt: row.changedAt,
+    changedBy: row.changedBy || '',
+  })),
 });
 
 const mapUser = (raw: any): User => ({
@@ -106,6 +115,30 @@ const mapUser = (raw: any): User => ({
   name: raw.name,
   role: raw.role,
   joinDate: raw.joinDate,
+});
+
+const mapBookReview = (row: any): BookReview => ({
+  id: String(row.id),
+  rating: Number(row.rating),
+  comment: row.comment || '',
+  userName: row.userName || 'Користувач',
+  createdAt: row.createdAt,
+});
+
+const mapBookReviewModeration = (row: any): BookReviewModeration => ({
+  id: String(row.id),
+  bookId: String(row.bookId),
+  bookTitle: row.bookTitle || '',
+  userName: row.userName || '',
+  userEmail: row.userEmail || '',
+  rating: Number(row.rating || 0),
+  comment: row.comment || '',
+  status: row.status,
+  moderation_note: row.moderation_note || '',
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+  moderatedAt: row.moderatedAt || null,
+  moderatedBy: row.moderatedBy || '',
 });
 
 const tokenStore = {
@@ -223,11 +256,20 @@ export const apiService = {
     return mapUser(user);
   },
 
+  async getDemoAccounts(): Promise<DemoAuthAccount[]> {
+    const payload = await request<{ accounts?: DemoAuthAccount[] }>(`/auth/demo-accounts/`, undefined, false);
+    return Array.isArray(payload?.accounts) ? payload.accounts : [];
+  },
+
   async getBooks(filters?: {
     q?: string;
     category?: string;
     minPrice?: number;
     maxPrice?: number;
+    minYear?: number;
+    maxYear?: number;
+    minRating?: number;
+    publisher?: string;
     inStock?: boolean;
     sort?: 'price_asc' | 'price_desc' | 'pages_asc' | 'pages_desc';
   }): Promise<Book[]> {
@@ -237,6 +279,10 @@ export const apiService = {
       if (filters?.category) params.set('category', filters.category);
       if (typeof filters?.minPrice === 'number') params.set('min_price', String(filters.minPrice));
       if (typeof filters?.maxPrice === 'number') params.set('max_price', String(filters.maxPrice));
+      if (typeof filters?.minYear === 'number') params.set('min_year', String(filters.minYear));
+      if (typeof filters?.maxYear === 'number') params.set('max_year', String(filters.maxYear));
+      if (typeof filters?.minRating === 'number') params.set('min_rating', String(filters.minRating));
+      if (filters?.publisher) params.set('publisher', filters.publisher);
       if (typeof filters?.inStock === 'boolean') params.set('in_stock', String(filters.inStock));
       if (filters?.sort) params.set('sort', filters.sort);
       const query = params.toString();
@@ -259,8 +305,23 @@ export const apiService = {
     return unwrapList<any>(raw).map(mapUser);
   },
 
-  async getOrders(): Promise<Order[]> {
-    const raw = await request<unknown>(`/orders/?page_size=200`);
+  async getOrders(filters?: {
+    status?: string;
+    customerId?: string;
+    promoCode?: string;
+    paymentMethod?: string;
+    deliveryMethod?: string;
+    q?: string;
+  }): Promise<Order[]> {
+    const params = new URLSearchParams();
+    params.set('page_size', '200');
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.customerId) params.set('customer_id', filters.customerId);
+    if (filters?.promoCode) params.set('promo_code', filters.promoCode);
+    if (filters?.paymentMethod) params.set('payment_method', filters.paymentMethod);
+    if (filters?.deliveryMethod) params.set('delivery_method', filters.deliveryMethod);
+    if (filters?.q) params.set('q', filters.q);
+    const raw = await request<unknown>(`/orders/?${params.toString()}`);
     return unwrapList<any>(raw).map(mapOrderFromApi);
   },
 
@@ -368,6 +429,39 @@ export const apiService = {
     return { orderId: String(created.orderId), order: mapOrderFromApi(created.order) };
   },
 
+  async previewCheckout(payload: {
+    deliveryMethod: Order['deliveryMethod'];
+    promoCode?: string;
+    items: Array<{ bookId: string; quantity: number }>;
+  }): Promise<{
+    subtotalAmount: number;
+    shippingAmount: number;
+    discountAmount: number;
+    totalAmount: number;
+    promoApplied: string;
+  }> {
+    const data = await request<any>(`/orders/checkout-preview/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        customerName: '',
+        paymentMethod: 'card',
+        deliveryMethod: payload.deliveryMethod,
+        promoCode: payload.promoCode || '',
+        items: payload.items.map((item) => ({
+          bookId: item.bookId,
+          quantity: item.quantity,
+        })),
+      }),
+    });
+    return {
+      subtotalAmount: Number(data.subtotalAmount || 0),
+      shippingAmount: Number(data.shippingAmount || 0),
+      discountAmount: Number(data.discountAmount || 0),
+      totalAmount: Number(data.totalAmount || 0),
+      promoApplied: data.promoApplied || '',
+    };
+  },
+
   async validateCart(payload: { items: Array<{ bookId: string; quantity: number }> }): Promise<void> {
     const books = await this.getBooks();
     const issue = payload.items.find((item) => {
@@ -397,6 +491,53 @@ export const apiService = {
 
   async getPromoCodes(): Promise<PromoCode[]> {
     const raw = await request<unknown>(`/promo-codes/`);
-    return unwrapList<any>(raw).map((item) => ({ ...item, value: Number(item.value) }));
+    return unwrapList<any>(raw).map((item) => ({
+      ...item,
+      value: Number(item.value),
+      min_order_amount: Number(item.min_order_amount || 0),
+      per_user_limit: Number(item.per_user_limit || 0),
+    }));
+  },
+
+  async getBookReviews(bookId: string): Promise<BookReview[]> {
+    const raw = await request<any[]>(`/books/${bookId}/reviews/`, undefined, false);
+    return (raw || []).map(mapBookReview);
+  },
+
+  async submitBookReview(
+    bookId: string,
+    payload: { rating: number; comment: string }
+  ): Promise<{ detail: string }> {
+    return request<{ detail: string }>(
+      `/books/${bookId}/reviews/`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          rating: payload.rating,
+          comment: payload.comment,
+        }),
+      },
+      true
+    );
+  },
+
+  async getReviewsForModeration(filters?: { status?: 'pending' | 'approved' | 'rejected'; bookId?: string }): Promise<BookReviewModeration[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.bookId) params.set('book_id', filters.bookId);
+    const query = params.toString();
+    const raw = await request<unknown>(`/book-reviews/${query ? `?${query}` : ''}`);
+    return unwrapList<any>(raw).map(mapBookReviewModeration);
+  },
+
+  async moderateReview(
+    reviewId: string,
+    payload: { status: 'pending' | 'approved' | 'rejected'; moderation_note?: string }
+  ): Promise<BookReviewModeration> {
+    const row = await request<any>(`/book-reviews/${reviewId}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return mapBookReviewModeration(row);
   },
 };

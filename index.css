@@ -176,6 +176,29 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
 }
 
+.catalog-filters .catalog-select {
+  border: 0;
+  border-radius: 8px;
+}
+
+.catalog-filters.theme-dark .catalog-select {
+  color-scheme: dark;
+}
+
+.catalog-filters.theme-light .catalog-select {
+  color-scheme: light;
+}
+
+.catalog-filters.theme-dark .catalog-select option {
+  background: #111827;
+  color: #f3f4f6;
+}
+
+.catalog-filters.theme-light .catalog-select option {
+  background: #ffffff;
+  color: #111827;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

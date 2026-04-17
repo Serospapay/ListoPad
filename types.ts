@@ -9,6 +9,7 @@ export interface Book {
   inventory: number;
   low_stock_threshold?: number;
   rating: number;
+  reviewsCount?: number;
   coverImage: string;
   images?: string[]; 
   pages: number;
@@ -73,6 +74,8 @@ export interface Order {
   deliveryMethod: 'nova_poshta' | 'standard';
   trackingNumber?: string;
   orderedAt?: string;
+  paidAt?: string;
+  packedAt?: string;
   shippedAt?: string;
   atBranchAt?: string;
   receivedAt?: string;
@@ -80,6 +83,7 @@ export interface Order {
   closedAt?: string;
   cancelledAt?: string;
   items?: OrderItem[];
+  statusHistory?: OrderStatusHistoryItem[];
 }
 
 export interface OrderItem {
@@ -91,10 +95,24 @@ export interface OrderItem {
   line_total: number;
 }
 
+export interface OrderStatusHistoryItem {
+  fromStatus: string;
+  toStatus: string;
+  changedAt: string;
+  changedBy: string;
+}
+
 export interface ApiErrorShape {
   detail: string;
   code: number;
   fields?: Record<string, unknown>;
+}
+
+export interface DemoAuthAccount {
+  role: 'user' | 'admin';
+  email: string;
+  password: string;
+  name: string;
 }
 
 export interface PromoCode {
@@ -105,6 +123,32 @@ export interface PromoCode {
   expires_at?: string | null;
   max_uses: number;
   used_count: number;
+  min_order_amount?: number;
+  per_user_limit?: number;
+}
+
+export interface BookReview {
+  id: string;
+  rating: number;
+  comment: string;
+  userName: string;
+  createdAt: string;
+}
+
+export interface BookReviewModeration {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  userName: string;
+  userEmail: string;
+  rating: number;
+  comment: string;
+  status: 'pending' | 'approved' | 'rejected';
+  moderation_note: string;
+  createdAt: string;
+  updatedAt: string;
+  moderatedAt: string | null;
+  moderatedBy: string;
 }
 
 export type ViewType = 

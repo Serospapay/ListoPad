@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Order, Customer } from '../types';
+import React, { useMemo, useState } from 'react';
+import { Customer, Order, OrderStatus } from '../types';
 
 interface AdminOrdersProps {
   orders: Order[];
@@ -11,20 +11,39 @@ interface AdminOrdersProps {
 
 const AdminOrders: React.FC<AdminOrdersProps> = ({ orders, customers, onUpdateStatus, isDarkMode }) => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+  const [promoFilter, setPromoFilter] = useState('');
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const cardBg = isDarkMode ? 'bg-stone-900/20 border-stone-800 backdrop-blur-md' : 'bg-white/20 border-stone-200 backdrop-blur-md';
   const textTitle = isDarkMode ? 'text-stone-100' : 'text-stone-900';
   const textMuted = isDarkMode ? 'text-stone-500' : 'text-stone-400';
   const headerBg = isDarkMode ? 'bg-stone-950/40' : 'bg-stone-50/40';
 
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      if (statusFilter !== 'all' && order.status !== statusFilter) return false;
+      if (promoFilter.trim() && !(order.promoCode || '').toLowerCase().includes(promoFilter.trim().toLowerCase())) return false;
+      if (!searchQuery.trim()) return true;
+      const needle = searchQuery.trim().toLowerCase();
+      return (
+        order.customerName?.toLowerCase().includes(needle)
+        || order.customerId.toLowerCase().includes(needle)
+        || order.bookTitle.toLowerCase().includes(needle)
+        || order.id.toLowerCase().includes(needle)
+      );
+    });
+  }, [orders, promoFilter, searchQuery, statusFilter]);
+
   const ordersByCustomer = useMemo(() => {
     const groups: { [key: string]: Order[] } = {};
-    orders.forEach(order => {
+    filteredOrders.forEach((order) => {
       if (!groups[order.customerId]) groups[order.customerId] = [];
       groups[order.customerId].push(order);
     });
     return groups;
-  }, [orders]);
+  }, [filteredOrders]);
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -40,6 +59,32 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ orders, customers, onUpdateSt
       case 'received': return 'Отримано';
       default: return status;
     }
+  };
+
+  const getStatusClass = (status: string) => {
+    if (status === 'ordered') return 'border-rose-900/40 text-rose-500';
+    if (status === 'paid' || status === 'packed') return 'border-amber-900/40 text-amber-500';
+    if (status === 'shipped' || status === 'shipping') return 'border-orange-900/40 text-orange-500';
+    if (status === 'delivered' || status === 'at_branch') return 'border-sky-900/40 text-sky-500';
+    if (status === 'closed' || status === 'received') return 'border-emerald-900/40 text-emerald-500';
+    if (status === 'cancelled') return 'border-zinc-700/60 text-zinc-400';
+    return 'border-zinc-700/60 text-zinc-400';
+  };
+
+  const getNextStatuses = (status: OrderStatus): OrderStatus[] => {
+    const map: Record<OrderStatus, OrderStatus[]> = {
+      ordered: ['paid', 'cancelled'],
+      paid: ['packed', 'cancelled'],
+      packed: ['shipped', 'cancelled'],
+      shipped: ['delivered'],
+      delivered: ['closed'],
+      closed: [],
+      cancelled: [],
+      shipping: ['delivered'],
+      at_branch: ['closed'],
+      received: [],
+    };
+    return map[status] || [];
   };
 
   const selectedCustomerInfo = useMemo(() => {
@@ -60,8 +105,45 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ orders, customers, onUpdateSt
         <h2 className={`text-4xl font-serif-gothic font-black italic ${textTitle}`}>Реєстр Замовлень</h2>
       </div>
 
+      <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 p-6 border ${cardBg}`}>
+        <label className="space-y-2">
+          <span className={`text-[10px] font-black uppercase tracking-[0.24em] ${textMuted}`}>Пошук</span>
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Клієнт, книга, ID..."
+            className={`w-full p-3 border bg-transparent text-sm ${isDarkMode ? 'border-stone-800 text-stone-200' : 'border-stone-200 text-stone-900'}`}
+          />
+        </label>
+        <label className="space-y-2">
+          <span className={`text-[10px] font-black uppercase tracking-[0.24em] ${textMuted}`}>Статус</span>
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as 'all' | OrderStatus)}
+            className={`w-full p-3 border bg-transparent text-sm ${isDarkMode ? 'border-stone-800 text-stone-200' : 'border-stone-200 text-stone-900'}`}
+          >
+            <option value="all">Всі статуси</option>
+            <option value="ordered">Створено</option>
+            <option value="paid">Оплачено</option>
+            <option value="packed">Упаковано</option>
+            <option value="shipped">Відправлено</option>
+            <option value="delivered">Доставлено</option>
+            <option value="closed">Закрито</option>
+            <option value="cancelled">Скасовано</option>
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className={`text-[10px] font-black uppercase tracking-[0.24em] ${textMuted}`}>Промокод</span>
+          <input
+            value={promoFilter}
+            onChange={(event) => setPromoFilter(event.target.value)}
+            placeholder="Напр. SAVE10"
+            className={`w-full p-3 border bg-transparent text-sm ${isDarkMode ? 'border-stone-800 text-stone-200' : 'border-stone-200 text-stone-900'}`}
+          />
+        </label>
+      </div>
+
       <div className="space-y-16">
-        {/* Fix: Explicitly cast Object.entries to ensure customerOrders is recognized as Order[] type */}
         {(Object.entries(ordersByCustomer) as [string, Order[]][]).map(([customerId, customerOrders]) => {
           const customerName = customerOrders[0].customerName || 'Гість';
           return (
@@ -92,6 +174,8 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ orders, customers, onUpdateSt
                     <tr>
                       <th className="px-8 py-4">ID / Дата</th>
                       <th className="px-8 py-4">Назва книги</th>
+                      <th className="px-8 py-4">Платіж / Доставка</th>
+                      <th className="px-8 py-4">Промо</th>
                       <th className="px-8 py-4">Сума</th>
                       <th className="px-8 py-4">Статус</th>
                       <th className="px-8 py-4 text-right">Змінити стан</th>
@@ -99,7 +183,8 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ orders, customers, onUpdateSt
                   </thead>
                   <tbody className={`divide-y ${isDarkMode ? 'divide-stone-800' : 'divide-stone-100'}`}>
                     {customerOrders.map((order) => (
-                      <tr key={order.id} className={`transition ${isDarkMode ? 'hover:bg-stone-800/20' : 'hover:bg-stone-50/50'}`}>
+                      <React.Fragment key={order.id}>
+                      <tr className={`transition ${isDarkMode ? 'hover:bg-stone-800/20' : 'hover:bg-stone-50/50'}`}>
                         <td className="px-8 py-6">
                           <p className={`font-mono text-[10px] ${textTitle}`}>#{order.id}</p>
                           <p className={`text-[8px] uppercase tracking-widest mt-1 ${textMuted}`}>{order.date}</p>
@@ -108,37 +193,71 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ orders, customers, onUpdateSt
                           <p className={`font-serif-gothic italic text-sm ${textTitle}`}>{order.bookTitle}</p>
                         </td>
                         <td className="px-8 py-6">
-                          <p className={`font-black text-xs ${textTitle}`}>{order.amount} ₴</p>
+                          <p className={`text-[10px] uppercase tracking-widest ${textMuted}`}>
+                            {order.paymentMethod} / {order.deliveryMethod}
+                          </p>
                         </td>
                         <td className="px-8 py-6">
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-3 py-1 border ${
-                            order.status === 'ordered' ? 'border-rose-900/40 text-rose-500' :
-                            order.status === 'paid' || order.status === 'packed' ? 'border-amber-900/40 text-amber-500' :
-                            order.status === 'shipped' || order.status === 'shipping' ? 'border-orange-900/40 text-orange-500' :
-                            order.status === 'delivered' || order.status === 'at_branch' ? 'border-sky-900/40 text-sky-500' :
-                            order.status === 'closed' || order.status === 'received' ? 'border-emerald-900/40 text-emerald-500' :
-                            order.status === 'cancelled' ? 'border-zinc-700/60 text-zinc-400' :
-                            'border-emerald-900/40 text-emerald-500'
-                          }`}>
+                          <p className={`text-[10px] font-black uppercase tracking-widest ${textTitle}`}>{order.promoCode || '—'}</p>
+                        </td>
+                        <td className="px-8 py-6">
+                          <p className={`font-black text-xs ${textTitle}`}>{order.totalAmount ?? order.amount} ₴</p>
+                          {(order.discountAmount || 0) > 0 && (
+                            <p className="text-[9px] text-emerald-500 uppercase tracking-widest mt-1">Знижка: {order.discountAmount} ₴</p>
+                          )}
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-3 py-1 border ${getStatusClass(order.status)}`}>
                             {getStatusLabel(order.status)}
                           </span>
+                          {order.statusHistory && order.statusHistory.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedOrderId((prev) => (prev === order.id ? null : order.id))}
+                              className={`mt-2 block text-[8px] font-black uppercase tracking-widest ${textMuted} hover:opacity-100 opacity-70`}
+                            >
+                              {expandedOrderId === order.id ? 'Сховати таймлайн' : 'Показати таймлайн'}
+                            </button>
+                          )}
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <select 
-                            value={order.status}
-                            onChange={(e) => onUpdateStatus(order.id, e.target.value as Order['status'])}
-                            className={`text-[9px] font-black uppercase tracking-widest bg-transparent border p-2 focus:outline-none ${isDarkMode ? 'border-stone-800 text-stone-400' : 'border-stone-200 text-stone-600'}`}
-                          >
-                            <option value="ordered">Створено</option>
-                            <option value="paid">Оплачено</option>
-                            <option value="packed">Упаковано</option>
-                            <option value="shipped">Відправлено</option>
-                            <option value="delivered">Доставлено</option>
-                            <option value="closed">Закрито</option>
-                            <option value="cancelled">Скасовано</option>
-                          </select>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {getNextStatuses(order.status).map((target) => (
+                              <button
+                                key={`${order.id}-${target}`}
+                                type="button"
+                                onClick={() => onUpdateStatus(order.id, target)}
+                                className={`text-[9px] font-black uppercase tracking-widest border px-3 py-2 ${isDarkMode ? 'border-stone-700 text-stone-300 hover:text-stone-100 hover:border-stone-500' : 'border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-400'}`}
+                              >
+                                {getStatusLabel(target)}
+                              </button>
+                            ))}
+                            {getNextStatuses(order.status).length === 0 && (
+                              <span className={`text-[9px] font-black uppercase tracking-widest ${textMuted}`}>Фінальний стан</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
+                      {expandedOrderId === order.id && (
+                        <tr className={isDarkMode ? 'bg-stone-900/25' : 'bg-stone-100/50'}>
+                          <td colSpan={7} className="px-8 py-5">
+                            <p className={`text-[9px] font-black uppercase tracking-widest mb-3 ${textMuted}`}>Таймлайн статусів</p>
+                            <div className="space-y-2">
+                              {(order.statusHistory || []).map((history, idx) => (
+                                <div key={`${order.id}-h-${idx}`} className="flex items-center justify-between text-[11px]">
+                                  <span className={textTitle}>
+                                    {getStatusLabel(history.fromStatus || 'ordered')} {'->'} {getStatusLabel(history.toStatus)}
+                                  </span>
+                                  <span className={textMuted}>
+                                    {new Date(history.changedAt).toLocaleString('uk-UA')} {history.changedBy ? `• ${history.changedBy}` : ''}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>

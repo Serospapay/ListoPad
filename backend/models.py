@@ -1,6 +1,7 @@
 
 from django.conf import settings
 from django.db import models
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 
 class Category(models.Model):
@@ -24,6 +25,7 @@ class Book(models.Model):
     format = models.CharField(max_length=100, default='145x215 мм')
     weight = models.CharField(max_length=100, default='550 г')
     rating = models.FloatField(default=0.0)
+    review_count = models.PositiveIntegerField(default=0)
     low_stock_threshold = models.PositiveIntegerField(default=3)
     categories = models.ManyToManyField(Category, blank=True)
 
@@ -36,6 +38,7 @@ class Book(models.Model):
             models.Index(fields=['inventory']),
             models.Index(fields=['title']),
             models.Index(fields=['author']),
+            models.Index(fields=['rating']),
         ]
 
 
@@ -78,6 +81,8 @@ class Order(models.Model):
     idempotency_key = models.CharField(max_length=100, blank=True, null=True, unique=True)
     date = models.DateTimeField(auto_now_add=True)
     ordered_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(blank=True, null=True)
+    packed_at = models.DateTimeField(blank=True, null=True)
     shipped_at = models.DateTimeField(blank=True, null=True)
     at_branch_at = models.DateTimeField(blank=True, null=True)
     received_at = models.DateTimeField(blank=True, null=True)
@@ -152,6 +157,8 @@ class PromoCode(models.Model):
     expires_at = models.DateTimeField(blank=True, null=True)
     max_uses = models.PositiveIntegerField(default=0)
     used_count = models.PositiveIntegerField(default=0)
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    per_user_limit = models.PositiveIntegerField(default=1)
 
     class Meta:
         indexes = [
@@ -236,4 +243,50 @@ class NotificationOutbox(models.Model):
         indexes = [
             models.Index(fields=['status', 'created_at']),
             models.Index(fields=['notification_type', 'created_at']),
+        ]
+
+
+class PromoCodeRedemption(models.Model):
+    promo_code = models.ForeignKey(PromoCode, on_delete=models.CASCADE, related_name='redemptions')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='promo_redemptions')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='promo_redemptions')
+    used_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['promo_code', 'user']),
+        ]
+
+
+class BookReview(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Очікує модерації'
+        APPROVED = 'approved', 'Підтверджено'
+        REJECTED = 'rejected', 'Відхилено'
+
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='reviews')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='book_reviews')
+    rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
+    comment = models.TextField(max_length=2000)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    moderation_note = models.CharField(max_length=255, blank=True, default='')
+    moderated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='moderated_book_reviews',
+    )
+    moderated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['book', 'user'], name='unique_book_user_review'),
+        ]
+        indexes = [
+            models.Index(fields=['book', 'status']),
+            models.Index(fields=['status', 'created_at']),
         ]
